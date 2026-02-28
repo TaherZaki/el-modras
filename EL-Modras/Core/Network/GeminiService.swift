@@ -70,9 +70,9 @@ final class GeminiServiceImpl: GeminiService {
     
     private(set) var isSessionActive: Bool = false
     
-    init(baseURL: String = AppConfig.backendURL, apiKey: String = AppConfig.geminiAPIKey) {
+    init(baseURL: String = AppConfig.backendURL, apiKey: String? = AppConfig.geminiAPIKey) {
         self.baseURL = baseURL
-        self.apiKey = apiKey
+        self.apiKey = apiKey ?? "" // API Key not needed for iOS - backend handles Gemini calls
     }
     
     // MARK: - Live Session Management

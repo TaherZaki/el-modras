@@ -86,10 +86,34 @@ final class AudioServiceImpl: NSObject, AudioService {
     private func setupAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
+            // Use playback category first for TTS, then switch to playAndRecord for recording
+            try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
+            try session.setActive(true)
+            print("✅ Audio session setup successfully")
+        } catch {
+            print("❌ Failed to setup audio session: \(error)")
+        }
+    }
+    
+    private func setupForRecording() {
+        do {
+            let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
             try session.setActive(true)
+            print("✅ Audio session setup for recording")
         } catch {
-            print("Failed to setup audio session: \(error)")
+            print("❌ Failed to setup audio session for recording: \(error)")
+        }
+    }
+    
+    private func setupForPlayback() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.defaultToSpeaker, .mixWithOthers])
+            try session.setActive(true)
+            print("✅ Audio session setup for playback")
+        } catch {
+            print("❌ Failed to setup audio session for playback: \(error)")
         }
     }
     
@@ -107,6 +131,8 @@ final class AudioServiceImpl: NSObject, AudioService {
     
     func startRecording() async throws {
         guard !isRecording else { return }
+        
+        setupForRecording() // Switch to recording mode
         
         let hasPermission = await requestPermission()
         guard hasPermission else {
@@ -279,7 +305,6 @@ final class AudioServiceImpl: NSObject, AudioService {
         
         // Filter Arabic voices
         let arabicVoices = voices.filter { $0.language.hasPrefix("ar") }
-        
         // Prefer premium/enhanced voices (they sound more natural)
         if let premiumVoice = arabicVoices.first(where: {
             $0.quality == .enhanced || $0.quality == .premium
@@ -303,7 +328,7 @@ final class AudioServiceImpl: NSObject, AudioService {
     
     func speak(_ text: String, language: String = "en-US") async {
         stopSpeaking() // Stop any current speech
-        
+        setupForPlayback() // Ensure audio session is set for playback
         let utterance = AVSpeechUtterance(string: text)
         
         // Use the Arabic teacher voice
@@ -327,9 +352,9 @@ final class AudioServiceImpl: NSObject, AudioService {
     
     func speakArabic(_ text: String) async {
         stopSpeaking() // Stop any current speech
+        setupForPlayback() // Ensure audio session is set for playback
         
         let utterance = AVSpeechUtterance(string: text)
-        
         // Use the Arabic teacher voice
         utterance.voice = teacherVoice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.7 // Even slower for Arabic clarity
@@ -353,6 +378,7 @@ final class AudioServiceImpl: NSObject, AudioService {
     /// Falls back to device TTS if natural voice is not available
     func speakNaturalArabic(_ text: String, using geminiService: GeminiService) async {
         stopSpeaking()
+        setupForPlayback() // Ensure audio session is set for playback
         
         // Try to get natural speech from backend
         do {
