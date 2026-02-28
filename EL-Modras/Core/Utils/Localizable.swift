@@ -76,7 +76,14 @@ enum L10n {
     static let home = "home".localized
     static let stars = "stars".localized
     
+    // MARK: - Stories
+    static let interactiveStories = "interactive_stories".localized
+    static let newBadge = "new".localized
+    static let minutes = "minutes".localized
+    static let storyComplete = "story_complete".localized
+    static let wordsLearned = "words_learned".localized
+    static let backToHome = "back_to_home".localized
+    
     // MARK: - Units
     static let of = "of".localized
-    static let minutes = "minutes".localized
 }

@@ -15,6 +15,7 @@ struct KidsHomeView: View {
     @State private var isSpeaking: Bool = false
     @State private var welcomeMessage: String = ""
     @State private var showingLesson: Lesson?
+    @State private var showingStory: Story?
     @State private var showingCamera: Bool = false
     @State private var showingProgress: Bool = false
     @State private var bounceAnimation: Bool = false
@@ -56,6 +57,9 @@ struct KidsHomeView: View {
                                 // Lesson Categories
                                 categoriesSection
                                 
+                                // Interactive Stories Section
+                                storiesSection
+                                
                                 // Fun Lessons Grid
                                 lessonsGrid
                             }
@@ -71,6 +75,15 @@ struct KidsHomeView: View {
             .navigationBarHidden(true)
             .sheet(item: $showingLesson) { lesson in
                 KidsLessonView(viewModel: dependencies.makeLessonViewModel(lesson: lesson))
+            }
+            .fullScreenCover(item: $showingStory) { story in
+                InteractiveStoryView(
+                    viewModel: StoryViewModel(
+                        story: story,
+                        audioService: audioService,
+                        geminiService: geminiService
+                    )
+                )
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraVocabView(viewModel: dependencies.makeCameraVocabViewModel())
@@ -325,6 +338,36 @@ struct KidsHomeView: View {
                         color: .indigo
                     ) {
                         // Filter alphabet
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Stories Section
+    private var storiesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("📖 قصص تفاعلية")
+                    .font(.title3.bold())
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Text("جديد!")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.red))
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(Story.allStories, id: \.id) { story in
+                        StoryCard(story: story) {
+                            showingStory = story
+                        }
                     }
                 }
             }
@@ -855,6 +898,66 @@ struct KidsStatCard: View {
                 .fill(.white)
                 .shadow(color: .black.opacity(0.1), radius: 5, y: 3)
         )
+    }
+}
+
+// MARK: - Story Card
+struct StoryCard: View {
+    let story: Story
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                // Story cover
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: storyColors,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 140, height: 140)
+                    
+                    Text(story.coverEmoji)
+                        .font(.system(size: 60))
+                }
+                
+                // Story title
+                Text(story.titleArabic)
+                    .font(.headline)
+                    .foregroundStyle(Color.black.opacity(0.85))
+                
+                // Duration
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.caption2)
+                    Text("\(story.estimatedMinutes) دقايق")
+                        .font(.caption)
+                }
+                .foregroundStyle(.gray)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.1), radius: 8)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var storyColors: [Color] {
+        switch story.coverEmoji {
+        case "🐱":
+            return [Color.orange.opacity(0.6), Color.yellow.opacity(0.6)]
+        case "🧒":
+            return [Color.blue.opacity(0.6), Color.cyan.opacity(0.6)]
+        default:
+            return [Color.purple.opacity(0.6), Color.pink.opacity(0.6)]
+        }
     }
 }
 

@@ -121,7 +121,6 @@ enum LessonCategory: String, Codable, CaseIterable {
         case .conversation: return "bubble.left.and.bubble.right.fill"
         case .grammar: return "textformat.abc"
         case .alphabet: return "character.book.closed.fill.ar"
-        case .alphabet: return "character.book.closed.fill.ar"
         }
     }
 }
