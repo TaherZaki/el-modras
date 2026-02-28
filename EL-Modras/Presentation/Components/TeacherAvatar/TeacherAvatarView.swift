@@ -49,11 +49,11 @@ struct TeacherAvatarView: View {
         VStack(spacing: 0) {
             // Avatar Character
             ZStack {
-                // Background Circle
+                // Background Circle with mood-based color
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.2)],
+                            colors: backgroundColors,
                             center: .center,
                             startRadius: 50,
                             endRadius: 150
@@ -62,7 +62,23 @@ struct TeacherAvatarView: View {
                     .frame(width: 280, height: 280)
                     .scaleEffect(animator.breathingScale)
                 
-                // Drawn Avatar
+                // Listening Waves (when listening)
+                if mood == .listening {
+                    ListeningWaves()
+                }
+                
+                // Thinking Dots (when thinking)
+                if mood == .thinking {
+                    ThinkingDotsView()
+                        .offset(y: -140)
+                }
+                
+                // Celebration Effects (when celebrating)
+                if mood == .celebrating {
+                    CelebrationConfetti()
+                }
+                
+                // Drawn Avatar with head nodding
                 DrawnTeacherFace(
                     mood: mood,
                     mouthShape: animator.currentMouthShape,
@@ -70,17 +86,18 @@ struct TeacherAvatarView: View {
                 )
                 .frame(width: 200, height: 220)
                 .scaleEffect(animator.characterScale)
+                .rotationEffect(.degrees(animator.headNodAngle))
+                .offset(y: animator.headBobOffset)
             }
             
             // Speech Bubble
-            if !message.isEmpty && isSpeaking {
-                SpeechBubble(text: message)
+            if !message.isEmpty {
+                SpeechBubble(text: message, mood: mood)
                     .transition(.scale.combined(with: .opacity))
                     .padding(.top, -20)
             }
         }
         .onChange(of: isSpeaking) { _, newValue in
-            // Immediately update mouth state - no delay
             if newValue {
                 animator.startSpeaking()
             } else {
@@ -93,6 +110,146 @@ struct TeacherAvatarView: View {
         .onAppear {
             animator.startIdleAnimations()
         }
+    }
+    
+    // Background colors based on mood
+    private var backgroundColors: [Color] {
+        switch mood {
+        case .celebrating:
+            return [Color.yellow.opacity(0.4), Color.orange.opacity(0.3)]
+        case .happy:
+            return [Color.green.opacity(0.3), Color.mint.opacity(0.2)]
+        case .thinking:
+            return [Color.purple.opacity(0.3), Color.indigo.opacity(0.2)]
+        case .listening:
+            return [Color.cyan.opacity(0.3), Color.blue.opacity(0.2)]
+        case .encouraging:
+            return [Color.pink.opacity(0.3), Color.orange.opacity(0.2)]
+        default:
+            return [Color.blue.opacity(0.3), Color.purple.opacity(0.2)]
+        }
+    }
+}
+
+// MARK: - Listening Waves Animation
+struct ListeningWaves: View {
+    @State private var animate = false
+    
+    var body: some View {
+        ZStack {
+            ForEach(0..<3) { index in
+                Circle()
+                    .stroke(Color.cyan.opacity(0.4 - Double(index) * 0.1), lineWidth: 3)
+                    .frame(width: 200 + CGFloat(index) * 40, height: 200 + CGFloat(index) * 40)
+                    .scaleEffect(animate ? 1.2 : 0.9)
+                    .opacity(animate ? 0.3 : 0.7)
+                    .animation(
+                        .easeInOut(duration: 1.0)
+                        .repeatForever(autoreverses: true)
+                        .delay(Double(index) * 0.2),
+                        value: animate
+                    )
+            }
+        }
+        .onAppear {
+            animate = true
+        }
+    }
+}
+
+// MARK: - Thinking Dots Animation
+struct ThinkingDotsView: View {
+    @State private var animatingDot = 0
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(Color.purple)
+                    .frame(width: 12, height: 12)
+                    .offset(y: animatingDot == index ? -10 : 0)
+                    .animation(
+                        .easeInOut(duration: 0.4),
+                        value: animatingDot
+                    )
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.1), radius: 5, y: 3)
+        )
+        .onAppear {
+            startAnimation()
+        }
+    }
+    
+    private func startAnimation() {
+        Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
+            animatingDot = (animatingDot + 1) % 3
+        }
+    }
+}
+
+// MARK: - Celebration Confetti
+struct CelebrationConfetti: View {
+    @State private var particles: [ConfettiParticle] = []
+    
+    var body: some View {
+        ZStack {
+            ForEach(particles) { particle in
+                ConfettiPiece(particle: particle)
+            }
+        }
+        .onAppear {
+            createParticles()
+        }
+    }
+    
+    private func createParticles() {
+        particles = (0..<30).map { _ in
+            ConfettiParticle(
+                x: CGFloat.random(in: -150...150),
+                y: CGFloat.random(in: -200...(-50)),
+                rotation: Double.random(in: 0...360),
+                color: [Color.red, .yellow, .green, .blue, .purple, .orange, .pink].randomElement()!,
+                size: CGFloat.random(in: 8...16)
+            )
+        }
+    }
+}
+
+struct ConfettiParticle: Identifiable {
+    let id = UUID()
+    var x: CGFloat
+    var y: CGFloat
+    var rotation: Double
+    var color: Color
+    var size: CGFloat
+}
+
+struct ConfettiPiece: View {
+    let particle: ConfettiParticle
+    @State private var falling = false
+    @State private var rotating = false
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(particle.color)
+            .frame(width: particle.size, height: particle.size * 0.6)
+            .rotationEffect(.degrees(rotating ? particle.rotation + 360 : particle.rotation))
+            .offset(x: particle.x, y: falling ? 200 : particle.y)
+            .opacity(falling ? 0 : 1)
+            .onAppear {
+                withAnimation(.easeIn(duration: Double.random(in: 1.5...2.5))) {
+                    falling = true
+                }
+                withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                    rotating = true
+                }
+            }
     }
 }
 
@@ -155,17 +312,17 @@ struct DrawnTeacherFace: View {
             }
             .offset(y: 10)
             
-            // Eyebrows
+            // Eyebrows - animated based on mood
             HStack(spacing: 45) {
-                EyebrowView(isLeft: true)
-                EyebrowView(isLeft: false)
+                EyebrowView(isLeft: true, mood: mood)
+                EyebrowView(isLeft: false, mood: mood)
             }
             .offset(y: -15)
             
             // Eyes
             HStack(spacing: 38) {
-                EyeView2(isBlinking: isBlinking)
-                EyeView2(isBlinking: isBlinking)
+                EyeView2(isBlinking: isBlinking, mood: mood)
+                EyeView2(isBlinking: isBlinking, mood: mood)
             }
             .offset(y: 10)
             
@@ -203,13 +360,41 @@ struct EarView: View {
 // MARK: - Eyebrow View
 struct EyebrowView: View {
     let isLeft: Bool
+    var mood: TeacherMood = .idle
+    
+    private var rotation: Double {
+        switch mood {
+        case .surprised:
+            return isLeft ? -10 : 10  // Raised
+        case .thinking:
+            return isLeft ? 15 : -5   // One raised
+        case .happy, .celebrating:
+            return isLeft ? -5 : 5    // Relaxed up
+        case .encouraging:
+            return isLeft ? 8 : -8    // Slight raise
+        default:
+            return isLeft ? 5 : -5    // Neutral
+        }
+    }
+    
+    private var offsetY: CGFloat {
+        switch mood {
+        case .surprised:
+            return -5
+        case .thinking:
+            return isLeft ? -3 : 0
+        default:
+            return 0
+        }
+    }
     
     var body: some View {
         Capsule()
             .fill(Color(red: 0.25, green: 0.18, blue: 0.12))
             .frame(width: 25, height: 5)
-            // Neutral/friendly angle - not too tilted
-            .rotationEffect(.degrees(isLeft ? 5 : -5))
+            .rotationEffect(.degrees(rotation))
+            .offset(y: offsetY)
+            .animation(.easeInOut(duration: 0.2), value: mood)
     }
 }
 
@@ -235,14 +420,27 @@ struct CheekView: View {
 // MARK: - Eye View
 struct EyeView2: View {
     let isBlinking: Bool
+    var mood: TeacherMood = .idle
+    
+    private var eyeHeight: CGFloat {
+        switch mood {
+        case .happy, .celebrating:
+            return isBlinking ? 3 : 20  // Squinted happy eyes
+        case .surprised:
+            return isBlinking ? 3 : 32  // Wide eyes
+        default:
+            return isBlinking ? 3 : 28  // Normal
+        }
+    }
     
     var body: some View {
         ZStack {
             // White
             Ellipse()
                 .fill(.white)
-                .frame(width: 32, height: isBlinking ? 3 : 28)
+                .frame(width: 32, height: eyeHeight)
                 .animation(.easeInOut(duration: 0.1), value: isBlinking)
+                .animation(.easeInOut(duration: 0.2), value: mood)
             
             if !isBlinking {
                 // Iris
@@ -429,27 +627,62 @@ struct CelebrationStars: View {
 // MARK: - Speech Bubble
 struct SpeechBubble: View {
     let text: String
+    var mood: TeacherMood = .idle
     
     var body: some View {
         VStack(spacing: 0) {
             // Bubble pointer
             Triangle()
-                .fill(Color.white)
+                .fill(bubbleColor)
                 .frame(width: 20, height: 12)
                 .rotationEffect(.degrees(180))
             
             // Bubble content
-            Text(text)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.85))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+            HStack(spacing: 8) {
+                // Mood emoji
+                if let emoji = moodEmoji {
+                    Text(emoji)
+                        .font(.title2)
+                }
+                
+                Text(text)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.black.opacity(0.85))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(bubbleColor)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
         }
-        .frame(maxWidth: 300)
+        .frame(maxWidth: 320)
+    }
+    
+    private var bubbleColor: Color {
+        switch mood {
+        case .celebrating:
+            return Color.yellow.opacity(0.95)
+        case .encouraging:
+            return Color.green.opacity(0.15).opacity(0.95)
+        default:
+            return .white
+        }
+    }
+    
+    private var moodEmoji: String? {
+        switch mood {
+        case .celebrating:
+            return "🎉"
+        case .encouraging:
+            return "💪"
+        case .thinking:
+            return "🤔"
+        case .listening:
+            return "👂"
+        default:
+            return nil
+        }
     }
 }
 
@@ -472,10 +705,14 @@ class TeacherAnimator: ObservableObject {
     @Published var isBlinking: Bool = false
     @Published var breathingScale: CGFloat = 1.0
     @Published var characterScale: CGFloat = 1.0
+    @Published var headNodAngle: Double = 0.0
+    @Published var headBobOffset: CGFloat = 0.0
     
     private var blinkingTask: Task<Void, Never>?
     private var breathingTask: Task<Void, Never>?
     private var speakingTask: Task<Void, Never>?
+    private var noddingTask: Task<Void, Never>?
+    private var listeningTask: Task<Void, Never>?
     
     func startIdleAnimations() {
         startBlinking()
@@ -484,9 +721,13 @@ class TeacherAnimator: ObservableObject {
     
     func startSpeaking() {
         speakingTask?.cancel()
+        noddingTask?.cancel()
         
         // IMMEDIATELY start with open mouth - no delay
         currentMouthShape = .open
+        
+        // Start head bob while speaking
+        startHeadBobWhileSpeaking()
         
         // Natural mouth animation like human speech
         speakingTask = Task { [weak self] in
@@ -507,27 +748,174 @@ class TeacherAnimator: ObservableObject {
         }
     }
     
+    private func startHeadBobWhileSpeaking() {
+        noddingTask = Task { [weak self] in
+            guard let self = self else { return }
+            
+            while !Task.isCancelled {
+                // Small head movements while speaking
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.headBobOffset = -3
+                    self.headNodAngle = Double.random(in: -2...2)
+                }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.headBobOffset = 0
+                    self.headNodAngle = Double.random(in: -2...2)
+                }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+            }
+        }
+    }
+    
     func stopSpeaking() {
         speakingTask?.cancel()
         speakingTask = nil
+        noddingTask?.cancel()
+        noddingTask = nil
+        
+        // Reset head position
+        withAnimation(.easeOut(duration: 0.2)) {
+            headBobOffset = 0
+            headNodAngle = 0
+        }
+        
         // Close mouth when done speaking
         currentMouthShape = .closed
     }
     
+    func startListening() {
+        listeningTask?.cancel()
+        
+        // Head nodding while listening (like "I understand")
+        listeningTask = Task { [weak self] in
+            guard let self = self else { return }
+            
+            while !Task.isCancelled {
+                // Nod down
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    self.headNodAngle = 5
+                    self.headBobOffset = 5
+                }
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                
+                // Nod up
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    self.headNodAngle = -2
+                    self.headBobOffset = 0
+                }
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                
+                // Pause between nods
+                try? await Task.sleep(nanoseconds: 800_000_000)
+            }
+        }
+    }
+    
+    func stopListening() {
+        listeningTask?.cancel()
+        listeningTask = nil
+        
+        withAnimation(.easeOut(duration: 0.2)) {
+            headNodAngle = 0
+            headBobOffset = 0
+        }
+    }
+    
     func setMood(_ mood: TeacherMood) {
+        // Stop previous mood animations
+        listeningTask?.cancel()
+        noddingTask?.cancel()
+        
         switch mood {
-        case .happy, .celebrating:
+        case .happy:
             eyeState = .happy
             characterScale = 1.05
+            // Happy bounce
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                headBobOffset = -10
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    self.headBobOffset = 0
+                }
+            }
+            
+        case .celebrating:
+            eyeState = .happy
+            characterScale = 1.1
+            // Excited bouncing
+            startCelebrationBounce()
+            
         case .surprised:
             eyeState = .surprised
             characterScale = 1.1
+            // Quick head back
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                headNodAngle = -5
+                headBobOffset = -8
+            }
+            
         case .thinking:
             eyeState = .looking(direction: 0.5)
             characterScale = 1.0
+            // Look up and to the side
+            withAnimation(.easeInOut(duration: 0.5)) {
+                headNodAngle = -8
+            }
+            
+        case .listening:
+            eyeState = .normal
+            characterScale = 1.0
+            startListening()
+            
+        case .encouraging:
+            eyeState = .happy
+            characterScale = 1.03
+            // Gentle encouraging nod
+            withAnimation(.easeInOut(duration: 0.4)) {
+                headNodAngle = 5
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    self.headNodAngle = 0
+                }
+            }
+            
         default:
             eyeState = .normal
             characterScale = 1.0
+            withAnimation(.easeOut(duration: 0.3)) {
+                headNodAngle = 0
+                headBobOffset = 0
+            }
+        }
+    }
+    
+    private func startCelebrationBounce() {
+        noddingTask = Task { [weak self] in
+            guard let self = self else { return }
+            
+            for _ in 0..<5 {
+                if Task.isCancelled { break }
+                
+                withAnimation(.spring(response: 0.15, dampingFraction: 0.4)) {
+                    self.headBobOffset = -15
+                    self.headNodAngle = Double.random(in: -5...5)
+                }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                
+                withAnimation(.spring(response: 0.15, dampingFraction: 0.4)) {
+                    self.headBobOffset = 0
+                }
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+            
+            // Reset
+            withAnimation(.easeOut(duration: 0.3)) {
+                self.headNodAngle = 0
+            }
         }
     }
     
@@ -569,6 +957,8 @@ class TeacherAnimator: ObservableObject {
         blinkingTask?.cancel()
         breathingTask?.cancel()
         speakingTask?.cancel()
+        noddingTask?.cancel()
+        listeningTask?.cancel()
     }
 }
 

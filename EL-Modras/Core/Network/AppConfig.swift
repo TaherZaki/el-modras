@@ -18,13 +18,11 @@ enum AppConfig {
     }
     
     // MARK: - API Keys
-    static var geminiAPIKey: String {
-        guard let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"] ??
-              Bundle.main.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String else {
-            // Fallback for development - in production, use environment variables
-            return "AIzaSyBe-ZTUBG3tBg5ycC7nymQvV9UINdP_f9M"
-        }
-        return key
+    // Note: API Key is stored securely in Backend's Secret Manager
+    // iOS app doesn't need the key - all AI calls go through the backend
+    static var geminiAPIKey: String? {
+        return ProcessInfo.processInfo.environment["GEMINI_API_KEY"] ??
+               Bundle.main.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String
     }
     
     // MARK: - Firebase Configuration

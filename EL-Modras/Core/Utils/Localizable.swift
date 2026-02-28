@@ -35,7 +35,7 @@ enum L10n {
     static let wordsToLearn = "words_to_learn".localized
     static let recording = "recording".localized
     static let analyzingPronunciation = "analyzing_pronunciation".localized
-    static let pressAndSay = "press_and_say".localized
+    static let pressAndSay = "كرر 🎤"
     static let listening = "listening".localized
     static let letsStartLesson = "lets_start_lesson".localized
     static let letMeListen = "let_me_listen".localized
