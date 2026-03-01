@@ -522,12 +522,42 @@ struct KidsLessonView: View {
             
             withAnimation {
                 showCelebration = true
-                selectedWordIndex += 1
             }
             
-            // Move to next word after delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                moveToNextWord()
+            // After celebration, say the word in a sentence, then move to next word
+            Task {
+                // Wait for celebration to be visible
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                
+                // Keep celebration showing, change message
+                await MainActor.run {
+                    teacherMood = .speaking
+                    currentMessage = "هاحطهالك في جملة، ركز معايا! 👂"
+                    isSpeaking = true
+                }
+                
+                // Say "I'll put it in a sentence for you, focus with me"
+                if let word = viewModel.currentWord {
+                    await viewModel.speakSentenceIntro()
+                    
+                    // Small pause
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
+                    
+                    // Now say the sentence
+                    await viewModel.speakWordInSentence(word)
+                }
+                
+                // Wait a bit then move to next word
+                try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+                
+                await MainActor.run {
+                    withAnimation {
+                        showCelebration = false
+                        selectedWordIndex += 1
+                        isSpeaking = false
+                    }
+                    moveToNextWord()
+                }
             }
         } else if score.score >= 0.4 {
             // Good try - Egyptian Arabic
