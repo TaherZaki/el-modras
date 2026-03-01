@@ -32,6 +32,7 @@ final class AudioPreloader {
         ("أهلاً يا بطل!", .instruction),
         ("يلا نبدأ الدرس!", .instruction),
         ("قول معايا", .instruction),
+        ("كرر ورايا", .instruction),
         ("اسمع كويس", .instruction),
     ]
     

@@ -159,6 +159,15 @@ final class DependencyContainer: ObservableObject {
         )
     }
     
+    func makeStoryViewModel(story: Story) -> StoryViewModel {
+        StoryViewModel(
+            story: story,
+            audioService: audioService,
+            geminiService: geminiService,
+            trackWordLearnedUseCase: trackWordLearnedUseCase
+        )
+    }
+    
     private init() {}
 }
 

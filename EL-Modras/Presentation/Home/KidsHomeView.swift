@@ -76,13 +76,9 @@ struct KidsHomeView: View {
             .sheet(item: $showingLesson) { lesson in
                 KidsLessonView(viewModel: dependencies.makeLessonViewModel(lesson: lesson))
             }
-            .fullScreenCover(item: $showingStory) { story in
+            .sheet(item: $showingStory) { story in
                 InteractiveStoryView(
-                    viewModel: StoryViewModel(
-                        story: story,
-                        audioService: audioService,
-                        geminiService: geminiService
-                    )
+                    viewModel: dependencies.makeStoryViewModel(story: story)
                 )
             }
             .fullScreenCover(isPresented: $showingCamera) {
@@ -795,6 +791,7 @@ struct KidsProgressView: View {
                         .frame(width: 44, height: 44)
                 }
                 .padding()
+                .padding(.top, 20)
                 
                 // Trophy/Avatar area
                 ZStack {
@@ -883,11 +880,11 @@ struct KidsStatCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.black.opacity(0.6))
                 
                 Text(value)
                     .font(.title2.bold())
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.black)
             }
             
             Spacer()

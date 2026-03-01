@@ -27,6 +27,7 @@ struct InteractiveStoryView: View {
                     storyContentView
                 }
             }
+            .padding(.top, 20)
             
             // Confetti for celebrations
             if viewModel.avatarMood == .celebrating {

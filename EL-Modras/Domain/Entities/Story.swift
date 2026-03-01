@@ -63,7 +63,7 @@ extension Story {
                 backgroundEmoji: "🏠",
                 characterEmoji: "🐱",
                 narratorText: "This is Mimi the cat. Say: Cat!",
-                narratorTextArabic: "دي ميمي القطة! قول معايا: قطة!",
+                narratorTextArabic: "دي ميمي القطة! قطة، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "cat_story",
@@ -142,7 +142,7 @@ extension Story {
                 backgroundEmoji: "🏪",
                 characterEmoji: "🐱",
                 narratorText: "Mimi went to the market and found a fish! Say: Fish!",
-                narratorTextArabic: "ميمي راحت السوق ولقت سمكة! قول: سمكة!",
+                narratorTextArabic: "ميمي راحت السوق ولقت سمكة! سمكة، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "fish_story",
@@ -162,7 +162,7 @@ extension Story {
                 backgroundEmoji: "🌳",
                 characterEmoji: "🐱",
                 narratorText: "Mimi went to the garden and saw a bird! Say: Bird!",
-                narratorTextArabic: "ميمي راحت الحديقة وشافت طائر! قول: طائر!",
+                narratorTextArabic: "ميمي راحت الحديقة وشافت طائر! طائر، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "bird_story",
@@ -182,7 +182,7 @@ extension Story {
                 backgroundEmoji: "🏡",
                 characterEmoji: "🐱",
                 narratorText: "Mimi went home and found milk! Say: Milk!",
-                narratorTextArabic: "ميمي راحت البيت ولقت حليب! قول: حليب!",
+                narratorTextArabic: "ميمي راحت البيت ولقت حليب! حليب، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "milk_story",
@@ -239,7 +239,7 @@ extension Story {
                 backgroundEmoji: "🌙",
                 characterEmoji: "🐱",
                 narratorText: "Mimi says goodbye! Say: Goodbye!",
-                narratorTextArabic: "ميمي بتقول مع السلامة! قول: مع السلامة!",
+                narratorTextArabic: "ميمي بتقول مع السلامة! مع السلامة، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "goodbye_story",
@@ -271,7 +271,7 @@ extension Story {
                 backgroundEmoji: "🏪",
                 characterEmoji: "🧒",
                 narratorText: "This is Ahmed. He's going to the market!",
-                narratorTextArabic: "ده أحمد! رايح السوق!",
+                narratorTextArabic: "ده أحمد! رايح السوق! سوق، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "market_ahmed",
@@ -346,7 +346,7 @@ extension Story {
                 backgroundEmoji: "🏪",
                 characterEmoji: "🧒",
                 narratorText: "Ahmed bought it! Now he says thank you!",
-                narratorTextArabic: "أحمد اشتراها! دلوقتي بيقول شكراً!",
+                narratorTextArabic: "أحمد اشتراها! دلوقتي بيقول شكراً! شكراً، كرر ورايا!",
                 choices: nil,
                 wordToLearn: Word(
                     id: "thanks_ahmed",

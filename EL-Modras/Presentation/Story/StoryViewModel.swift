@@ -32,15 +32,20 @@ final class StoryViewModel: ObservableObject {
     // MARK: - Dependencies
     private let audioService: AudioService
     private let geminiService: GeminiService
+    private let trackWordLearnedUseCase: TrackWordLearnedUseCase?
     
     // MARK: - Initialization
-    init(story: Story, audioService: AudioService, geminiService: GeminiService) {
+    init(story: Story, audioService: AudioService, geminiService: GeminiService, trackWordLearnedUseCase: TrackWordLearnedUseCase? = nil) {
         self.story = story
         self.audioService = audioService
         self.geminiService = geminiService
+        self.trackWordLearnedUseCase = trackWordLearnedUseCase
         self.currentScene = story.scenes.first!
         self.sceneHistory = [story.scenes.first!.id]
     }
+    
+    // MARK: - Audio Cache
+    private let cacheManager = AudioCacheManager.shared
     
     // MARK: - Story Navigation
     
@@ -52,6 +57,12 @@ final class StoryViewModel: ObservableObject {
         starsEarned = 0
         isStoryComplete = false
         
+        // Start preloading audio in background for instant playback
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            await AudioPreloader.shared.preloadStory(self.story, using: self.geminiService)
+        }
+        
         // Speak the first scene
         await speakCurrentScene()
     }
@@ -60,8 +71,18 @@ final class StoryViewModel: ObservableObject {
         isPlaying = true
         avatarMood = .speaking
         
-        // Speak the Arabic narrator text
-        await audioService.speakNaturalArabic(currentScene.narratorTextArabic, using: geminiService)
+        // Try to play from cache first (instant!)
+        if let cachedAudio = cacheManager.getAudio(for: currentScene.narratorTextArabic, type: .instruction) {
+            do {
+                try await audioService.playAudio(cachedAudio)
+            } catch {
+                // Fallback to live TTS
+                await audioService.speakNaturalArabic(currentScene.narratorTextArabic, using: geminiService)
+            }
+        } else {
+            // Fallback to live TTS (will also cache it)
+            await audioService.speakNaturalArabic(currentScene.narratorTextArabic, using: geminiService)
+        }
         
         isPlaying = false
         
@@ -83,11 +104,19 @@ final class StoryViewModel: ObservableObject {
         // If choice has a word, speak it and add to learned words
         if let word = choice.word {
             isPlaying = true
-            await audioService.speakNaturalArabic(word.arabic, using: geminiService)
+            // Try cached audio first
+            if let cachedAudio = cacheManager.getAudio(for: word.arabic, type: .word) {
+                try? await audioService.playAudio(cachedAudio)
+            } else {
+                await audioService.speakNaturalArabic(word.arabic, using: geminiService)
+            }
             isPlaying = false
             
             wordsLearned.append(word)
             starsEarned += 1
+            
+            // Track progress
+            await trackWordLearned(word)
         }
         
         // Navigate to next scene
@@ -112,38 +141,31 @@ final class StoryViewModel: ObservableObject {
     }
     
     func goToNextScene() {
-        // Find next scene in order (not by ID, since some scenes are branches)
-        let currentId = currentScene.id
+        let currentNumber = currentScene.sceneNumber
         
-        // Try to find the next sequential scene
-        if let currentIndex = story.scenes.firstIndex(where: { $0.id == currentId }) {
-            // Look for next scene that isn't a branch of current
-            for i in (currentIndex + 1)..<story.scenes.count {
-                let nextScene = story.scenes[i]
-                // Skip branch scenes (scene_3_market, scene_3_garden, etc.)
-                if !nextScene.id.contains("_market") &&
-                   !nextScene.id.contains("_garden") &&
-                   !nextScene.id.contains("_home") ||
-                   sceneHistory.contains(where: { nextScene.id.hasPrefix($0.replacingOccurrences(of: "_market", with: "").replacingOccurrences(of: "_garden", with: "").replacingOccurrences(of: "_home", with: "")) }) {
-                    
-                    // Check if this is the logical next scene
-                    let nextNumber = nextScene.sceneNumber
-                    let currentNumber = currentScene.sceneNumber
-                    
-                    if nextNumber > currentNumber {
-                        currentScene = nextScene
-                        sceneHistory.append(nextScene.id)
-                        showChoices = false
-                        pronunciationScore = nil
-                        return
-                    }
-                }
+        // Find next scene with higher scene number that we haven't visited
+        // OR if we're in a branch scene, find the next main scene
+        for scene in story.scenes {
+            // Skip scenes we've already visited
+            if sceneHistory.contains(scene.id) {
+                continue
+            }
+            
+            // Find next scene number (could be branch or main)
+            if scene.sceneNumber > currentNumber {
+                currentScene = scene
+                sceneHistory.append(scene.id)
+                showChoices = false
+                pronunciationScore = nil
+                print("📖 Moving to scene: \(scene.id) (number: \(scene.sceneNumber))")
+                return
             }
         }
         
         // If no next scene found, story is complete
         isStoryComplete = true
         avatarMood = .celebrating
+        print("🎉 Story complete!")
     }
     
     // MARK: - Pronunciation
@@ -174,16 +196,35 @@ final class StoryViewModel: ObservableObject {
                 return
             }
             
-            // Check pronunciation with Gemini
-            let response = try await geminiService.analyzePronunciation(
-                audioData: audioData,
-                expectedText: wordToLearn.arabic
-            )
+            // Try LOCAL speech recognition first (instant!)
+            let localRecognizer = LocalSpeechRecognizer.shared
+            var score: PronunciationScore
             
-            // Parse score from response
-            let score = parsePronunciationScore(from: response, word: wordToLearn)
+            do {
+                let recognizedText = try await localRecognizer.recognize(audioData: audioData)
+                print("🎤 Story - Recognized locally: \(recognizedText)")
+                
+                // Compare with expected word (instant!)
+                let matchResult = localRecognizer.compareWords(recognized: recognizedText, expected: wordToLearn.arabic)
+                
+                score = PronunciationScore(
+                    wordId: wordToLearn.id,
+                    score: matchResult.score,
+                    feedback: matchResult.isMatch ? "ممتاز!" : "حاول تاني",
+                    timestamp: Date()
+                )
+            } catch {
+                print("⚠️ Local recognition failed, falling back to Gemini: \(error)")
+                
+                // Fallback to Gemini (slower but more accurate)
+                let response = try await geminiService.analyzePronunciation(
+                    audioData: audioData,
+                    expectedText: wordToLearn.arabic
+                )
+                score = parsePronunciationScore(from: response, word: wordToLearn)
+            }
+            
             pronunciationScore = score
-            
             isProcessing = false
             
             // Handle result
@@ -193,9 +234,17 @@ final class StoryViewModel: ObservableObject {
                 wordsLearned.append(wordToLearn)
                 starsEarned += 1
                 
-                // Celebrate and move to next scene
+                // Track progress
+                await trackWordLearned(wordToLearn)
+                
+                // Celebrate and move to next scene (use cached audio!)
                 isPlaying = true
-                await audioService.speakNaturalArabic("برافو عليك يا بطل! 🌟", using: geminiService)
+                let celebrationText = "برافو عليك يا بطل! 🌟"
+                if let cachedAudio = cacheManager.getAudio(for: celebrationText, type: .response) {
+                    try? await audioService.playAudio(cachedAudio)
+                } else {
+                    await audioService.speakNaturalArabic(celebrationText, using: geminiService)
+                }
                 isPlaying = false
                 
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -207,10 +256,37 @@ final class StoryViewModel: ObservableObject {
                     await speakCurrentScene()
                 }
             } else {
-                // Need to try again
+                // Need to try again (use cached audio!)
                 avatarMood = .encouraging
                 isPlaying = true
-                await audioService.speakNaturalArabic("حاول تاني! قول: \(wordToLearn.arabic)", using: geminiService)
+                let tryAgainText = "حاول تاني!"
+                if let cachedAudio = cacheManager.getAudio(for: tryAgainText, type: .response) {
+                    try? await audioService.playAudio(cachedAudio)
+                } else {
+                    await audioService.speakNaturalArabic(tryAgainText, using: geminiService)
+                }
+                
+                // Small pause
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                
+                // Say the word first
+                if let cachedWordAudio = cacheManager.getAudio(for: wordToLearn.arabic, type: .word) {
+                    try? await audioService.playAudio(cachedWordAudio)
+                } else {
+                    await audioService.speakNaturalArabic(wordToLearn.arabic, using: geminiService)
+                }
+                
+                // Small pause
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                
+                // Then say "كرر ورايا"
+                let repeatPrompt = "كرر ورايا"
+                if let cachedPromptAudio = cacheManager.getAudio(for: repeatPrompt, type: .instruction) {
+                    try? await audioService.playAudio(cachedPromptAudio)
+                } else {
+                    await audioService.speakNaturalArabic(repeatPrompt, using: geminiService)
+                }
+                
                 isPlaying = false
                 avatarMood = .listening
             }
@@ -256,5 +332,22 @@ final class StoryViewModel: ObservableObject {
         }.count
         let currentNumber = currentScene.sceneNumber
         return Double(currentNumber) / Double(max(totalMainScenes, 1))
+    }
+    
+    // MARK: - Progress Tracking
+    
+    private func trackWordLearned(_ word: Word) async {
+        guard let useCase = trackWordLearnedUseCase else { return }
+        
+        do {
+            try await useCase.execute(
+                word: word,
+                category: word.category,
+                userId: "current_user"
+            )
+            print("✅ Story: Tracked word learned: \(word.arabic)")
+        } catch {
+            print("❌ Story: Failed to track word: \(error)")
+        }
     }
 }
