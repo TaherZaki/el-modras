@@ -114,6 +114,12 @@ final class LessonViewModel: ObservableObject {
         sessionState = .connecting
         error = nil
         
+        // Start preloading audio in background
+        Task.detached { [weak self] in
+            guard let self = self else { return }
+            await AudioPreloader.shared.preloadLesson(self.lesson, using: self.geminiService)
+        }
+        
         do {
             // Request microphone permission
             let hasPermission = await audioService.requestPermission()
@@ -310,8 +316,48 @@ final class LessonViewModel: ObservableObject {
             )
             messages.append(userMessage)
             
-            // Send to Gemini
-            guard let session = session else { return }
+            // Check if we're practicing a word
+            if let word = currentWord {
+                // Try LOCAL speech recognition first (instant!)
+                let localRecognizer = LocalSpeechRecognizer.shared
+                
+                do {
+                    let recognizedText = try await localRecognizer.recognize(audioData: audioData)
+                    print("🎤 Recognized locally: \(recognizedText)")
+                    
+                    // Update message with recognized text
+                    if let lastIndex = messages.indices.last {
+                        messages[lastIndex] = ConversationMessage(
+                            role: .user,
+                            content: recognizedText
+                        )
+                    }
+                    
+                    // Compare with expected word (instant!)
+                    let matchResult = localRecognizer.compareWords(recognized: recognizedText, expected: word.arabic)
+                    
+                    // Create pronunciation score
+                    pronunciationScore = PronunciationScore(
+                        wordId: word.id,
+                        score: matchResult.score,
+                        feedback: matchResult.isMatch ? "ممتاز!" : "حاول تاني",
+                        timestamp: Date()
+                    )
+                    
+                    isProcessing = false
+                    return
+                    
+                } catch {
+                    print("⚠️ Local recognition failed, falling back to Gemini: \(error)")
+                }
+            }
+            
+            // Fallback: Send to Gemini (slower but more accurate)
+            guard let session = session else {
+                isProcessing = false
+                return
+            }
+            
             let response = try await sendVoiceMessageUseCase.execute(
                 audioData: audioData,
                 session: session
@@ -328,11 +374,6 @@ final class LessonViewModel: ObservableObject {
             // Add assistant response
             messages.append(response)
             
-            // Play audio if available
-            if let audioData = response.audioURL {
-                // Would load and play audio from URL
-            }
-            
             // Check pronunciation if practicing a specific word
             if let word = currentWord {
                 let score = try await getPronunciationFeedbackUseCase.execute(
@@ -340,8 +381,6 @@ final class LessonViewModel: ObservableObject {
                     expectedWord: word
                 )
                 pronunciationScore = score
-                
-                // Note: moveToNextWord is handled by the View when it observes pronunciationScore change
             }
             
             isProcessing = false
@@ -400,17 +439,66 @@ final class LessonViewModel: ObservableObject {
     }
     
     func speakWord(_ word: Word) async {
-        // Add message to chat
-        let message = ConversationMessage(
+        // Step 1: Say the word
+        let wordMessage = ConversationMessage(
             role: .assistant,
-            content: "Listen: \(word.arabic) (\(word.transliteration)) - \(word.english)",
+            content: word.arabic,
             contentArabic: word.arabic
         )
-        messages.append(message)
+        messages.append(wordMessage)
         
-        // Speak ONLY the Arabic word using Gemini's natural voice
         isPlaying = true
         await audioService.speakNaturalArabic(word.arabic, using: geminiService)
+        isPlaying = false
+        
+        // Small pause
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        
+        // Step 2: Ask the student to repeat
+        let repeatRequest = "قول معايا: \(word.arabic)"
+        let repeatMessage = ConversationMessage(
+            role: .assistant,
+            content: repeatRequest,
+            contentArabic: repeatRequest
+        )
+        messages.append(repeatMessage)
+        
+        isPlaying = true
+        await audioService.speakNaturalArabic(repeatRequest, using: geminiService)
+        isPlaying = false
+    }
+    
+    /// Speak intro before sentence
+    func speakSentenceIntro() async {
+        let intro = "هاحطهالك في جملة، ركز معايا!"
+        
+        let introMessage = ConversationMessage(
+            role: .assistant,
+            content: intro,
+            contentArabic: intro
+        )
+        messages.append(introMessage)
+        
+        isPlaying = true
+        await audioService.speakNaturalArabic(intro, using: geminiService)
+        isPlaying = false
+    }
+    
+    /// Called after student successfully pronounces the word - says just the sentence
+    func speakWordInSentence(_ word: Word) async {
+        // Generate or get the sentence (Arabic first, then generate if not available)
+        let sentence = word.exampleSentenceArabic ?? word.exampleSentence ?? generateSimpleSentence(for: word)
+        
+        // Say the sentence
+        let sentenceMessage = ConversationMessage(
+            role: .assistant,
+            content: sentence,
+            contentArabic: sentence
+        )
+        messages.append(sentenceMessage)
+        
+        isPlaying = true
+        await audioService.speakNaturalArabic(sentence, using: geminiService)
         isPlaying = false
     }
     
@@ -533,21 +621,61 @@ final class LessonViewModel: ObservableObject {
             isRecording = false
             isProcessing = true
             
-            // Build context with current lesson and word
-            let lessonContext = buildLessonContext()
+            // 1. Try LOCAL speech recognition first (instant!)
+            let localRecognizer = LocalSpeechRecognizer.shared
+            let cacheManager = AudioCacheManager.shared
             
-            // Send audio to Gemini for transcription and response with lesson context
+            do {
+                let recognizedText = try await localRecognizer.recognize(audioData: audioData)
+                print("🎤 Question recognized locally: \(recognizedText)")
+                
+                // Add user's question
+                let userMessage = ConversationMessage(
+                    role: .user,
+                    content: recognizedText
+                )
+                messages.append(userMessage)
+                
+                // 2. Check for keywords (instant response!)
+                if let keyword = localRecognizer.detectKeywords(in: recognizedText) {
+                    let response = await handleKeyword(keyword)
+                    
+                    // Add response
+                    let assistantMessage = ConversationMessage(
+                        role: .assistant,
+                        content: response,
+                        contentArabic: response
+                    )
+                    messages.append(assistantMessage)
+                    
+                    // Speak response (from cache if available!)
+                    isPlaying = true
+                    await audioService.speakNaturalArabic(response, using: geminiService)
+                    isPlaying = false
+                    
+                    isProcessing = false
+                    return
+                }
+                
+            } catch {
+                print("⚠️ Local recognition failed: \(error)")
+            }
+            
+            // 3. Fallback: Send to Gemini (slower but handles complex questions)
+            let lessonContext = buildLessonContext()
             let response = try await geminiService.sendAudioMessageWithContext(
                 audioData: audioData,
                 context: lessonContext
             )
             
             // Add user's question (transcribed)
-            let userMessage = ConversationMessage(
-                role: .user,
-                content: "🎤 سؤال صوتي"
-            )
-            messages.append(userMessage)
+            if messages.last?.role != .user {
+                let userMessage = ConversationMessage(
+                    role: .user,
+                    content: "🎤 سؤال صوتي"
+                )
+                messages.append(userMessage)
+            }
             
             // Add response to chat
             let assistantMessage = ConversationMessage(
@@ -568,6 +696,74 @@ final class LessonViewModel: ObservableObject {
             self.error = error.localizedDescription
             isRecording = false
             isProcessing = false
+        }
+    }
+    
+    // Handle detected keyword with instant response
+    private func handleKeyword(_ keyword: DetectedKeyword) async -> String {
+        guard let word = currentWord else {
+            return "اختار كلمة الأول!"
+        }
+        
+        switch keyword {
+        case .repeat:
+            // Play the word again
+            isPlaying = true
+            await audioService.speakNaturalArabic(word.arabic, using: geminiService)
+            isPlaying = false
+            return "أيوه! \(word.arabic)"
+            
+        case .sentence:
+            // Generate/retrieve sentence (Arabic first!)
+            let sentence = word.exampleSentenceArabic ?? word.exampleSentence ?? generateSimpleSentence(for: word)
+            return sentence
+            
+        case .meaning:
+            return "\(word.arabic) يعني \(word.english)"
+            
+        case .next:
+            // Move to next word
+            moveToNextWord()
+            if let newWord = currentWord {
+                return "يلا! الكلمة الجديدة: \(newWord.arabic)"
+            } else {
+                return "خلصت الدرس! برافو عليك!"
+            }
+            
+        case .help:
+            return "مفيش مشكلة يا بطل! خلينا نجربها سوا. قول معايا: \(word.arabic)"
+        }
+    }
+    
+    // Generate simple sentence for a word (Egyptian Arabic)
+    private func generateSimpleSentence(for word: Word) -> String {
+        switch word.category {
+        case .animals:
+            return "شوف! ده \(word.arabic)"
+        case .food:
+            return "أنا بحب \(word.arabic) أوي"
+        case .colors:
+            return "اللون \(word.arabic) حلو أوي"
+        case .numbers:
+            return "ده رقم \(word.arabic)"
+        case .family:
+            return "ده \(word.arabic) بتاعي"
+        case .greetings:
+            return "لما نقابل حد نقول \(word.arabic)"
+        case .alphabet:
+            return "ده حرف \(word.arabic)"
+        case .bodyParts:
+            return "ده \(word.arabic) بتاعي"
+        case .household:
+            return "ده \(word.arabic) في البيت"
+        case .weather:
+            return "الجو \(word.arabic) النهاردة"
+        case .travel:
+            return "أنا رايح \(word.arabic)"
+        case .shopping:
+            return "أنا عايز أشتري \(word.arabic)"
+        default:
+            return "ده \(word.arabic)"
         }
     }
     

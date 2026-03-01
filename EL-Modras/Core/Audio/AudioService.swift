@@ -375,39 +375,62 @@ final class AudioServiceImpl: NSObject, AudioService {
     }
     
     /// Speak Arabic text using natural voice from Gemini/Google Cloud TTS
+    /// Uses cache for instant playback if available
     /// Falls back to device TTS if natural voice is not available
     func speakNaturalArabic(_ text: String, using geminiService: GeminiService) async {
         stopSpeaking()
         setupForPlayback() // Ensure audio session is set for playback
         
-        // Try to get natural speech from backend
+        let cacheManager = AudioCacheManager.shared
+        
+        // 1. Check cache first (instant playback!)
+        if let cachedAudio = cacheManager.getAudio(for: text, type: .word) ??
+                            cacheManager.getAudio(for: text, type: .sentence) ??
+                            cacheManager.getAudio(for: text, type: .response) ??
+                            cacheManager.getAudio(for: text, type: .instruction) {
+            print("⚡ Playing from cache: \(text)")
+            await playAudioData(cachedAudio)
+            return
+        }
+        
+        // 2. Try to get natural speech from backend
         do {
             if let audioData = try await geminiService.getNaturalSpeech(text: text) {
-                // Play the natural audio
-                isSpeaking = true
-                speakingProgressSubject.send(SpeakingProgress(isSpeaking: true, currentWord: nil, progress: 0))
+                // Save to cache for next time
+                cacheManager.saveAudio(audioData, for: text, type: .word)
                 
-                do {
-                    audioPlayer = try AVAudioPlayer(data: audioData)
-                    audioPlayer?.delegate = self
-                    audioPlayer?.prepareToPlay()
-                    audioPlayer?.play()
-                    
-                    // Wait for playback to finish
-                    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                        self.speechContinuation = continuation
-                    }
-                    return
-                } catch {
-                    print("Failed to play natural audio: \(error)")
-                }
+                // Play the natural audio
+                await playAudioData(audioData)
+                return
             }
         } catch {
             print("Failed to get natural speech: \(error)")
         }
         
-        // Fallback to device TTS
+        // 3. Fallback to device TTS
         await speakArabic(text)
+    }
+    
+    /// Helper to play audio data
+    private func playAudioData(_ audioData: Data) async {
+        isSpeaking = true
+        speakingProgressSubject.send(SpeakingProgress(isSpeaking: true, currentWord: nil, progress: 0))
+        
+        do {
+            audioPlayer = try AVAudioPlayer(data: audioData)
+            audioPlayer?.delegate = self
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.play()
+            
+            // Wait for playback to finish
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                self.speechContinuation = continuation
+            }
+        } catch {
+            print("Failed to play audio: \(error)")
+            isSpeaking = false
+            speakingProgressSubject.send(SpeakingProgress(isSpeaking: false, currentWord: nil, progress: 0))
+        }
     }
     
     func stopSpeaking() {
