@@ -28,6 +28,7 @@ protocol AudioService {
     func speak(_ text: String, language: String) async
     func speakArabic(_ text: String) async
     func speakNaturalArabic(_ text: String, using geminiService: GeminiService) async
+    func playAudioData(_ audioData: Data) async
     func stopSpeaking()
 }
 
@@ -299,22 +300,30 @@ final class AudioServiceImpl: NSObject, AudioService {
     
     // MARK: - Text-to-Speech
     
-    // Find the best Arabic voice available (prefer enhanced/premium voices)
+    // Find the best Arabic MALE voice available (teacher = male voice)
     private var teacherVoice: AVSpeechSynthesisVoice? {
         let voices = AVSpeechSynthesisVoice.speechVoices()
         
         // Filter Arabic voices
         let arabicVoices = voices.filter { $0.language.hasPrefix("ar") }
-        // Prefer premium/enhanced voices (they sound more natural)
+        
+        // 1st priority: Male premium/enhanced voice
+        if let malePremium = arabicVoices.first(where: {
+            $0.gender == .male && ($0.quality == .enhanced || $0.quality == .premium)
+        }) {
+            return malePremium
+        }
+        
+        // 2nd priority: Any male Arabic voice
+        if let maleArabic = arabicVoices.first(where: { $0.gender == .male }) {
+            return maleArabic
+        }
+        
+        // 3rd priority: Any enhanced/premium voice
         if let premiumVoice = arabicVoices.first(where: {
             $0.quality == .enhanced || $0.quality == .premium
         }) {
             return premiumVoice
-        }
-        
-        // Try to find male Arabic voice
-        if let maleArabic = arabicVoices.first(where: { $0.gender == .male }) {
-            return maleArabic
         }
         
         // Fallback to any Arabic voice
@@ -374,9 +383,9 @@ final class AudioServiceImpl: NSObject, AudioService {
         }
     }
     
-    /// Speak Arabic text using natural voice from Gemini/Google Cloud TTS
+    /// Speak Arabic text using natural voice from Gemini TTS (Orus male voice)
     /// Uses cache for instant playback if available
-    /// Falls back to device TTS if natural voice is not available
+    /// Retries Gemini TTS before falling back to device TTS for consistent voice
     func speakNaturalArabic(_ text: String, using geminiService: GeminiService) async {
         stopSpeaking()
         setupForPlayback() // Ensure audio session is set for playback
@@ -393,26 +402,38 @@ final class AudioServiceImpl: NSObject, AudioService {
             return
         }
         
-        // 2. Try to get natural speech from backend
-        do {
-            if let audioData = try await geminiService.getNaturalSpeech(text: text) {
-                // Save to cache for next time
-                cacheManager.saveAudio(audioData, for: text, type: .word)
-                
-                // Play the natural audio
-                await playAudioData(audioData)
-                return
+        // 2. Try Gemini TTS with retry (up to 3 attempts for consistent voice)
+        for attempt in 1...3 {
+            do {
+                print("🔊 Gemini TTS attempt \(attempt) for: \(text.prefix(30))...")
+                if let audioData = try await geminiService.getNaturalSpeech(text: text) {
+                    // Save to cache for next time
+                    cacheManager.saveAudio(audioData, for: text, type: .response)
+                    
+                    // Play the natural audio
+                    await playAudioData(audioData)
+                    return
+                }
+                // nil means no audio - treat as error for retry
+                print("⚠️ Gemini TTS attempt \(attempt) returned nil")
+            } catch {
+                print("⚠️ Gemini TTS attempt \(attempt) failed: \(error.localizedDescription)")
             }
-        } catch {
-            print("Failed to get natural speech: \(error)")
+            
+            // Wait before retry (increasing delay)
+            if attempt < 3 {
+                let delay = UInt64(attempt) * 500_000_000 // 0.5s, 1.0s
+                try? await Task.sleep(nanoseconds: delay)
+            }
         }
         
-        // 3. Fallback to device TTS
+        // 3. Last resort fallback to device TTS (should rarely happen)
+        print("⚠️ Falling back to device TTS for: \(text)")
         await speakArabic(text)
     }
     
-    /// Helper to play audio data
-    private func playAudioData(_ audioData: Data) async {
+    /// Helper to play audio data directly (public for when audio is already available)
+    func playAudioData(_ audioData: Data) async {
         isSpeaking = true
         speakingProgressSubject.send(SpeakingProgress(isSpeaking: true, currentWord: nil, progress: 0))
         

@@ -77,9 +77,21 @@ struct KidsLessonView: View {
             startLesson()
         }
         .onChange(of: viewModel.isPlaying) { _, newValue in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isSpeaking = newValue
-                teacherMood = newValue ? .speaking : .idle
+            // Only use this for non-speaking states (when isPlaying becomes false)
+            if !newValue {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isSpeaking = false
+                    teacherMood = .idle
+                }
+            }
+        }
+        // Listen to actual audio playback for lip-sync (triggers when audio REALLY plays)
+        .onReceive(viewModel.audioService.speakingProgressPublisher.receive(on: DispatchQueue.main)) { progress in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isSpeaking = progress.isSpeaking
+                if progress.isSpeaking {
+                    teacherMood = .speaking
+                }
             }
         }
         .onChange(of: viewModel.isProcessing) { _, isProcessing in
@@ -484,18 +496,14 @@ struct KidsLessonView: View {
         guard let word = viewModel.currentWord else { return }
         currentMessage = word.arabic
         
-        // Start mouth animation IMMEDIATELY before audio
-        isSpeaking = true
+        // Don't set isSpeaking here - let speakingProgressPublisher handle it
+        // when audio actually starts playing
         teacherMood = .speaking
         
         Task {
-            // Small delay to ensure mouth animation starts first
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-            
             await viewModel.speakWord(word)
             
-            // Speech finished - stop mouth animation
-            isSpeaking = false
+            // Speech finished
             teacherMood = .idle
         }
     }
@@ -533,7 +541,6 @@ struct KidsLessonView: View {
                 await MainActor.run {
                     teacherMood = .speaking
                     currentMessage = "هاحطهالك في جملة، ركز معايا! 👂"
-                    isSpeaking = true
                 }
                 
                 // Say "I'll put it in a sentence for you, focus with me"

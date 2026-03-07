@@ -12,12 +12,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (google-genai + google-adk)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

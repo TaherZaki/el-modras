@@ -31,9 +31,9 @@ async def text_to_speech(
     request: TTSRequest,
     authorization: Optional[str] = Header(None)
 ):
-    """Convert Arabic text to natural speech using Gemini or Google Cloud TTS"""
+    """Convert Arabic text to natural speech using Gemini TTS (Orus voice)"""
     try:
-        # Try Gemini's natural speech first
+        # Use Gemini TTS for consistent Orus voice across the app
         result = await gemini_service.generate_natural_speech(
             text=request.text,
             voice_style=request.voice_style
@@ -46,50 +46,13 @@ async def text_to_speech(
                 fallback_to_device=False
             )
         
-        # Fallback to Google Cloud TTS
-        try:
-            from google.cloud import texttospeech
-            
-            client = texttospeech.TextToSpeechClient()
-            
-            synthesis_input = texttospeech.SynthesisInput(text=request.text)
-            
-            # Use WaveNet for natural voice
-            voice = texttospeech.VoiceSelectionParams(
-                language_code="ar-XA",
-                name="ar-XA-Wavenet-B",  # Male Arabic WaveNet voice
-                ssml_gender=texttospeech.SsmlVoiceGender.MALE
-            )
-            
-            audio_config = texttospeech.AudioConfig(
-                audio_encoding=texttospeech.AudioEncoding.MP3,
-                speaking_rate=0.85,  # Slightly slower for kids
-                pitch=0.0,
-                effects_profile_id=["small-bluetooth-speaker-class-device"]
-            )
-            
-            response = client.synthesize_speech(
-                input=synthesis_input,
-                voice=voice,
-                audio_config=audio_config
-            )
-            
-            audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
-            
-            return TTSResponse(
-                audio_base64=audio_base64,
-                success=True,
-                fallback_to_device=False
-            )
-            
-        except Exception as tts_error:
-            logger.warning(f"Google Cloud TTS failed: {tts_error}")
-            # Tell client to use device TTS
-            return TTSResponse(
-                audio_base64=None,
-                success=False,
-                fallback_to_device=True
-            )
+        # Gemini TTS failed - tell client to retry or use device TTS
+        logger.warning(f"Gemini TTS failed for: {request.text[:50]}... error: {result.get('error')}")
+        return TTSResponse(
+            audio_base64=None,
+            success=False,
+            fallback_to_device=True
+        )
         
     except Exception as e:
         logger.error(f"TTS error: {e}")

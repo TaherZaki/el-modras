@@ -37,7 +37,7 @@ final class LessonViewModel: ObservableObject {
     private let getPronunciationFeedbackUseCase: GetPronunciationFeedbackUseCase
     private let trackWordLearnedUseCase: TrackWordLearnedUseCase
     private let trackLessonCompletedUseCase: TrackLessonCompletedUseCase
-    private let audioService: AudioService
+    let audioService: AudioService
     private let geminiService: GeminiService
     
     private var session: ConversationSession?
@@ -662,6 +662,7 @@ final class LessonViewModel: ObservableObject {
             }
             
             // 3. Fallback: Send to Gemini (slower but handles complex questions)
+            // Backend now does transcribe + answer + TTS in ONE call
             let lessonContext = buildLessonContext()
             let response = try await geminiService.sendAudioMessageWithContext(
                 audioData: audioData,
@@ -678,17 +679,29 @@ final class LessonViewModel: ObservableObject {
             }
             
             // Add response to chat
+            let responseText = response.arabicText ?? response.text
             let assistantMessage = ConversationMessage(
                 role: .assistant,
                 content: response.text,
-                contentArabic: response.arabicText ?? response.text
+                contentArabic: responseText
             )
             messages.append(assistantMessage)
             
-            // Speak the response
-            isPlaying = true
-            await audioService.speakNaturalArabic(response.arabicText ?? response.text, using: geminiService)
-            isPlaying = false
+            // Play audio - use audio from response directly if available (no second round trip!)
+            if let audioData = response.audioData {
+                // Audio came with the response - play it directly (fastest!)
+                isPlaying = true
+                await audioService.playAudioData(audioData)
+                isPlaying = false
+                
+                // Cache it for next time
+                AudioCacheManager.shared.saveAudio(audioData, for: responseText, type: .response)
+            } else {
+                // Fallback: get TTS separately (slower)
+                isPlaying = true
+                await audioService.speakNaturalArabic(responseText, using: geminiService)
+                isPlaying = false
+            }
             
             isProcessing = false
             

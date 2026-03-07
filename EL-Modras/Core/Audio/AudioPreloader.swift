@@ -2,7 +2,8 @@
 //  AudioPreloader.swift
 //  EL-Modras
 //
-//  Preloads audio for lessons to enable instant playback
+//  Smart audio preloader - minimizes API calls, maximizes cache hits
+//  Only preloads what's immediately needed, rest is on-demand + cached forever
 //
 
 import Foundation
@@ -15,125 +16,108 @@ final class AudioPreloader {
     private let cacheManager = AudioCacheManager.shared
     private var preloadTask: Task<Void, Never>?
     private var isPreloading = false
+    private var commonResponsesLoaded = false
     
-    // Common responses that should always be cached
-    private let commonResponses: [(text: String, type: AudioType)] = [
+    // ONLY the most essential responses (5 instead of 24)
+    // Everything else gets cached on first use and stays forever
+    private let essentialResponses: [(text: String, type: AudioType)] = [
         ("برافو عليك يا بطل!", .response),
-        ("شاطر أوي!", .response),
-        ("ممتاز!", .response),
         ("حاول تاني!", .response),
-        ("مش سامعك كويس، قول تاني", .response),
-        ("يلا نجرب مرة تانية", .response),
-        ("أحسنت!", .response),
-        ("رائع!", .response),
-        ("صح!", .response),
-        ("أيوه كده!", .response),
-        ("كمل كده!", .response),
-        ("أهلاً يا بطل!", .instruction),
-        ("يلا نبدأ الدرس!", .instruction),
-        ("قول معايا", .instruction),
         ("كرر ورايا", .instruction),
-        ("اسمع كويس", .instruction),
     ]
     
     private init() {}
     
-    // MARK: - Preload Lesson
+    // MARK: - Preload Lesson (SMART - minimal API calls)
     
-    /// Preloads all audio for a lesson
+    /// Preloads only the essential audio for a lesson
+    /// ~11 API calls instead of ~70: just the words + 3 essential responses
     func preloadLesson(_ lesson: Lesson, using geminiService: GeminiService) async {
         guard !isPreloading else { return }
         isPreloading = true
         
-        print("🔄 Preloading audio for lesson: \(lesson.titleArabic)")
+        let uncachedWords = lesson.words.filter { !cacheManager.hasAudio(for: $0.arabic, type: .word) }
+        print("🔄 Preloading lesson: \(lesson.titleArabic) (\(uncachedWords.count) uncached words)")
         
-        // Preload words
-        for word in lesson.words {
-            await preloadWord(word, using: geminiService)
-        }
-        
-        // Preload common responses
-        await preloadCommonResponses(using: geminiService)
-        
-        isPreloading = false
-        print("✅ Finished preloading lesson: \(lesson.titleArabic)")
-    }
-    
-    // MARK: - Preload Word
-    
-    /// Preloads audio for a single word (word + sentence)
-    func preloadWord(_ word: Word, using geminiService: GeminiService) async {
-        // Preload word pronunciation
-        if !cacheManager.hasAudio(for: word.arabic, type: .word) {
+        // Only preload the WORD itself (1 request per uncached word)
+        // Sentences, repeat prompts etc. get cached on first use
+        for word in uncachedWords {
             if let audioData = try? await geminiService.getNaturalSpeech(text: word.arabic) {
                 cacheManager.saveAudio(audioData, for: word.arabic, type: .word)
             }
         }
         
-        // Preload example sentence if available
-        if let sentence = word.exampleSentence, !cacheManager.hasAudio(for: sentence, type: .sentence) {
-            if let audioData = try? await geminiService.getNaturalSpeech(text: sentence) {
-                cacheManager.saveAudio(audioData, for: sentence, type: .sentence)
-            }
-        }
+        // Preload essential responses (only once ever, then cached)
+        await preloadEssentialResponses(using: geminiService)
         
-        // Generate and preload a simple sentence for this word
-        let simplesentence = generateSimpleSentence(for: word)
-        if !cacheManager.hasAudio(for: simplesentence, type: .sentence) {
-            if let audioData = try? await geminiService.getNaturalSpeech(text: simplesentence) {
-                cacheManager.saveAudio(audioData, for: simplesentence, type: .sentence)
-            }
-        }
+        isPreloading = false
+        print("✅ Lesson preloaded: \(lesson.titleArabic)")
     }
     
-    // MARK: - Preload Common Responses
+    // MARK: - Preload Essential Responses (only 3)
     
-    /// Preloads common responses (bravo, try again, etc.)
-    func preloadCommonResponses(using geminiService: GeminiService) async {
-        for response in commonResponses {
+    private func preloadEssentialResponses(using geminiService: GeminiService) async {
+        guard !commonResponsesLoaded else { return }
+        
+        for response in essentialResponses {
             if !cacheManager.hasAudio(for: response.text, type: response.type) {
                 if let audioData = try? await geminiService.getNaturalSpeech(text: response.text) {
                     cacheManager.saveAudio(audioData, for: response.text, type: response.type)
                 }
             }
         }
+        commonResponsesLoaded = true
     }
     
-    // MARK: - Preload Story
+    // MARK: - Preload Story (SMART - only first 2 scenes)
     
-    /// Preloads all audio for an interactive story
+    /// Preloads only the first 2 scenes of a story
+    /// Rest gets preloaded as user progresses
     func preloadStory(_ story: Story, using geminiService: GeminiService) async {
-        print("🔄 Preloading audio for story: \(story.titleArabic)")
+        print("🔄 Preloading story: \(story.titleArabic)")
         
-        for scene in story.scenes {
-            // Preload narrator text
-            if !cacheManager.hasAudio(for: scene.narratorTextArabic, type: .instruction) {
-                if let audioData = try? await geminiService.getNaturalSpeech(text: scene.narratorTextArabic) {
-                    cacheManager.saveAudio(audioData, for: scene.narratorTextArabic, type: .instruction)
-                }
-            }
-            
-            // Preload word to learn
-            if let word = scene.wordToLearn {
-                await preloadWord(word, using: geminiService)
-            }
-            
-            // Preload choices
-            if let choices = scene.choices {
-                for choice in choices {
-                    if !cacheManager.hasAudio(for: choice.textArabic, type: .word) {
-                        if let audioData = try? await geminiService.getNaturalSpeech(text: choice.textArabic) {
-                            cacheManager.saveAudio(audioData, for: choice.textArabic, type: .word)
-                        }
-                    }
-                }
+        // Only preload first 2 scenes
+        let scenesToPreload = Array(story.scenes.prefix(2))
+        
+        for scene in scenesToPreload {
+            await preloadScene(scene, using: geminiService)
+        }
+        
+        // Preload essential responses
+        await preloadEssentialResponses(using: geminiService)
+        
+        print("✅ Story preloaded (first 2 scenes): \(story.titleArabic)")
+    }
+    
+    /// Preload a single scene (narrator text + word only)
+    func preloadScene(_ scene: StoryScene, using geminiService: GeminiService) async {
+        // Preload narrator text
+        if !cacheManager.hasAudio(for: scene.narratorTextArabic, type: .instruction) {
+            if let audioData = try? await geminiService.getNaturalSpeech(text: scene.narratorTextArabic) {
+                cacheManager.saveAudio(audioData, for: scene.narratorTextArabic, type: .instruction)
             }
         }
         
-        // Preload common responses
-        await preloadCommonResponses(using: geminiService)
+        // Preload word to learn (just the word itself)
+        if let word = scene.wordToLearn {
+            if !cacheManager.hasAudio(for: word.arabic, type: .word) {
+                if let audioData = try? await geminiService.getNaturalSpeech(text: word.arabic) {
+                    cacheManager.saveAudio(audioData, for: word.arabic, type: .word)
+                }
+            }
+        }
+    }
+    
+    /// Call this when user moves to next scene - preloads upcoming scenes
+    func preloadUpcomingScenes(story: Story, currentIndex: Int, using geminiService: GeminiService) async {
+        // Preload next 2 scenes ahead
+        let startIdx = currentIndex + 1
+        let endIdx = min(currentIndex + 2, story.scenes.count - 1)
+        guard startIdx <= endIdx, startIdx < story.scenes.count else { return }
         
-        print("✅ Finished preloading story: \(story.titleArabic)")
+        for i in startIdx...endIdx {
+            await preloadScene(story.scenes[i], using: geminiService)
+        }
     }
     
     // MARK: - Cancel Preloading

@@ -32,6 +32,9 @@ protocol GeminiService {
     
     // Natural Text-to-Speech
     func getNaturalSpeech(text: String) async throws -> Data?
+    
+    // Image Generation (for interactive stories)
+    func generateStoryImage(prompt: String) async throws -> Data?
 }
 
 // MARK: - Response Models
@@ -59,6 +62,10 @@ struct GeminiPronunciationResponse {
 struct GeminiTextResponse {
     let text: String
     let arabicText: String?
+}
+
+struct GeminiImageResponse {
+    let imageData: Data
 }
 
 // MARK: - Gemini Service Implementation
@@ -380,6 +387,7 @@ final class GeminiServiceImpl: GeminiService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15 // 15 second timeout for TTS
         
         let body = TTSRequestDTO(text: text, voiceStyle: "friendly_teacher")
         request.httpBody = try JSONEncoder().encode(body)
@@ -388,17 +396,45 @@ final class GeminiServiceImpl: GeminiService {
         
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            return nil // Fallback to device TTS
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw GeminiError.networkError("TTS failed with status \(statusCode)")
         }
         
         let ttsResponse = try JSONDecoder().decode(TTSResponseDTO.self, from: data)
         
         // If successful, decode and return audio data
         if ttsResponse.success, let audioBase64 = ttsResponse.audioBase64 {
-            return Data(base64Encoded: audioBase64)
+            if let audioData = Data(base64Encoded: audioBase64), !audioData.isEmpty {
+                return audioData
+            }
+            throw GeminiError.networkError("TTS returned empty audio data")
         }
         
-        return nil // Fallback to device TTS
+        throw GeminiError.networkError("TTS returned success=false")
+    }
+    
+    // MARK: - Image Generation
+    
+    func generateStoryImage(prompt: String) async throws -> Data? {
+        let url = URL(string: "\(baseURL)/api/v1/image/generate")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        let body = ImageGenerationRequestDTO(prompt: prompt)
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw GeminiError.imageGenerationFailed
+        }
+        
+        let imageResponse = try JSONDecoder().decode(ImageGenerationResponseDTO.self, from: data)
+        
+        return imageResponse.imageBase64.flatMap { Data(base64Encoded: $0) }
     }
     
     // MARK: - Private Methods
@@ -471,6 +507,7 @@ enum GeminiError: Error, LocalizedError {
     case textSendFailed
     case chatSendFailed
     case networkError(String)
+    case imageGenerationFailed
     
     var errorDescription: String? {
         switch self {
@@ -496,6 +533,8 @@ enum GeminiError: Error, LocalizedError {
             return "Failed to send message. Please check your connection and try again."
         case .chatSendFailed:
             return "Failed to send chat message. Please try again."
+        case .imageGenerationFailed:
+            return "Failed to generate image. Please try again."
         }
     }
 }
@@ -599,6 +638,24 @@ private struct ChatRequestDTO: Codable {
 
 private struct ChatResponseDTO: Codable {
     let reply: String
+}
+
+private struct ImageGenerationRequestDTO: Codable {
+    let prompt: String
+}
+
+private struct ImageGenerationResponseDTO: Codable {
+    let imageBase64: String?
+    let mimeType: String?
+    let success: Bool
+    let error: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case imageBase64 = "image_base64"
+        case mimeType = "mime_type"
+        case success
+        case error
+    }
 }
 
 // MARK: - Notification Names

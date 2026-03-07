@@ -1,6 +1,7 @@
 """
 EL-Modras Backend - Main Application
-Arabic Language Tutor powered by Gemini Live API
+Arabic Language Tutor powered by Gemini Live API & ADK
+Uses the new google-genai SDK and Google ADK (Agent Development Kit)
 """
 
 import os
@@ -12,8 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from routers import session, vision, pronunciation, chat, tts, live
+from routers import agent as agent_router
+from routers import image_gen
 from services.gemini_service import GeminiService
 from services.gemini_live_service import gemini_live_service
+from services.adk_agent import adk_tutor_service
 from services.websocket_manager import WebSocketManager
 
 # Configure logging
@@ -34,10 +38,12 @@ async def lifespan(app: FastAPI):
     logger.info("Starting EL-Modras Backend...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Google Cloud Project: {settings.google_cloud_project}")
+    logger.info("SDK: google-genai (new) + Google ADK")
     
-    # Initialize Gemini services
+    # Initialize all services
     await gemini_service.initialize()
     await gemini_live_service.initialize()
+    await adk_tutor_service.initialize()
     
     yield
     
@@ -45,13 +51,14 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down EL-Modras Backend...")
     await gemini_service.cleanup()
     await gemini_live_service.cleanup()
+    await adk_tutor_service.cleanup()
 
 
 # Create FastAPI app
 app = FastAPI(
     title="EL-Modras API",
-    description="Arabic Language Tutor powered by Gemini Live API",
-    version="1.0.0",
+    description="Arabic Language Tutor powered by Gemini Live API, Google GenAI SDK & ADK",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -71,6 +78,8 @@ app.include_router(pronunciation.router, prefix="/api/v1/pronunciation", tags=["
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(tts.router, prefix="/api/v1/tts", tags=["Text-to-Speech"])
 app.include_router(live.router, tags=["Live API"])
+app.include_router(agent_router.router, prefix="/api/v1/agent", tags=["ADK Agent"])
+app.include_router(image_gen.router, prefix="/api/v1/image", tags=["Image Generation"])
 
 
 @app.get("/")
@@ -78,9 +87,20 @@ async def root():
     """Root endpoint"""
     return {
         "name": "EL-Modras API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "running",
-        "description": "Arabic Language Tutor powered by Gemini Live API"
+        "description": "Arabic Language Tutor powered by Gemini Live API & ADK",
+        "sdk": "google-genai (new GenAI SDK)",
+        "frameworks": ["Google ADK (Agent Development Kit)", "Gemini Live API"],
+        "google_cloud_services": [
+            "Cloud Run",
+            "Gemini 2.0 Flash (Live API)",
+            "Cloud Firestore",
+            "Secret Manager",
+            "Cloud Speech-to-Text",
+            "Cloud Text-to-Speech",
+            "Cloud Storage"
+        ]
     }
 
 
@@ -89,7 +109,10 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "gemini_connected": gemini_service.is_connected
+        "gemini_connected": gemini_service.is_connected,
+        "live_api_ready": gemini_live_service.is_initialized,
+        "adk_agent_ready": adk_tutor_service.is_initialized,
+        "model": settings.gemini_model
     }
 
 

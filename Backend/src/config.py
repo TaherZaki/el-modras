@@ -16,9 +16,12 @@ class Settings(BaseSettings):
     # Google Cloud
     google_cloud_project: str = os.getenv("GOOGLE_CLOUD_PROJECT", "el-modras")
     
-    # Gemini API
+    # Gemini API (using new google-genai SDK)
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_live_model: str = os.getenv("GEMINI_LIVE_MODEL", "gemini-2.0-flash-live-001")
+    gemini_image_model: str = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.0-flash-exp")
+    gemini_tts_model: str = os.getenv("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts")
     
     # Server
     host: str = os.getenv("HOST", "0.0.0.0")

@@ -1,6 +1,6 @@
 """
-Gemini Live Service - Real-time audio interaction with Gemini
-This enables natural conversation with interruption support
+Gemini Live Service - Real-time bidirectional audio interaction
+Uses the NEW google-genai SDK with client.aio.live.connect() for true Live API
 """
 
 import logging
@@ -11,7 +11,8 @@ from typing import Optional, Dict, Any, Callable, AsyncGenerator
 from dataclasses import dataclass
 from enum import Enum
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config import settings
 
@@ -27,22 +28,15 @@ class LiveSessionState(Enum):
     INTERRUPTED = "interrupted"
 
 
-@dataclass
-class LiveSessionConfig:
-    """Configuration for live session"""
-    voice_name: str = "Aoede"
-    language_code: str = "ar-XA"
-    response_modality: str = "AUDIO"
-    system_instruction: str = ""
-    
-
 class GeminiLiveService:
     """
-    Service for Gemini API with real-time-like audio interaction.
+    Service for Gemini Live API with REAL real-time bidirectional audio.
+    Uses client.aio.live.connect() for persistent streaming connections.
+    
     Supports:
-    - Audio input/output
-    - Interruption handling
-    - Natural conversation flow
+    - Real-time bidirectional audio streaming
+    - Interruption handling (barge-in)
+    - Natural conversation flow with Arabic tutor persona
     """
     
     _instance = None
@@ -57,7 +51,7 @@ class GeminiLiveService:
         if GeminiLiveService._initialized:
             return
         
-        self.model = None
+        self.client: Optional[genai.Client] = None
         self.active_sessions: Dict[str, Any] = {}
         self.is_initialized = False
         
@@ -80,18 +74,17 @@ Use simple Egyptian dialect when appropriate for kids."""
         GeminiLiveService._initialized = True
     
     async def initialize(self):
-        """Initialize the Gemini client"""
+        """Initialize the Gemini client with new GenAI SDK"""
         if self.is_initialized:
             return
         
         try:
-            genai.configure(api_key=settings.gemini_api_key)
-            self.model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",
-                system_instruction=self.system_instruction
+            self.client = genai.Client(
+                api_key=settings.gemini_api_key,
+                http_options={"api_version": "v1beta"}
             )
             self.is_initialized = True
-            logger.info("Gemini Live Service initialized successfully")
+            logger.info("Gemini Live Service initialized with new GenAI SDK (Live API)")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini Live Service: {e}")
             raise
@@ -110,7 +103,8 @@ Use simple Egyptian dialect when appropriate for kids."""
         on_interrupted: Optional[Callable[[], None]] = None
     ) -> Dict[str, Any]:
         """
-        Create a new live session for real-time audio conversation.
+        Create a new live session using Gemini Live API.
+        Establishes a persistent bidirectional connection via client.aio.live.connect()
         """
         try:
             await self.ensure_initialized()
@@ -120,12 +114,30 @@ Use simple Egyptian dialect when appropriate for kids."""
             if lesson_context:
                 full_instruction += f"\n\nCurrent lesson: {lesson_context}"
             
-            # Create a chat session
-            chat = self.model.start_chat(history=[])
+            # Configure the Live API session
+            live_config = types.LiveConnectConfig(
+                response_modalities=["AUDIO", "TEXT"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name="Orus"
+                        )
+                    )
+                ),
+                system_instruction=types.Content(
+                    parts=[types.Part.from_text(full_instruction)]
+                )
+            )
             
-            # Store session info
+            # Create the REAL Live API connection using client.aio.live.connect()
+            live_session = await self.client.aio.live.connect(
+                model="gemini-2.0-flash-live-001",
+                config=live_config
+            )
+            
+            # Store session info with the live connection
             self.active_sessions[session_id] = {
-                "chat": chat,
+                "live_session": live_session,
                 "state": LiveSessionState.IDLE,
                 "lesson_context": lesson_context,
                 "on_audio_response": on_audio_response,
@@ -135,13 +147,13 @@ Use simple Egyptian dialect when appropriate for kids."""
                 "conversation_history": []
             }
             
-            logger.info(f"Live session created: {session_id}")
+            logger.info(f"Live session created with real Live API: {session_id}")
             
             return {
                 "session_id": session_id,
                 "status": "created",
                 "supports_interruption": True,
-                "model": "gemini-2.5-flash"
+                "model": "gemini-2.0-flash-live-001"
             }
             
         except Exception as e:
@@ -149,59 +161,79 @@ Use simple Egyptian dialect when appropriate for kids."""
             raise
     
     async def send_audio_and_get_response(
-        self, 
-        session_id: str, 
+        self,
+        session_id: str,
         audio_data: bytes,
-        mime_type: str = "audio/wav"
+        mime_type: str = "audio/pcm"
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Send audio and get streaming response.
-        This simulates live interaction with streaming responses.
+        Send audio to the Live API session and stream back the response.
+        Uses the real bidirectional connection.
         """
         if session_id not in self.active_sessions:
             yield {"type": "error", "message": "Session not found"}
             return
         
         session = self.active_sessions[session_id]
+        live_session = session["live_session"]
         session["state"] = LiveSessionState.PROCESSING
         session["is_interrupted"] = False
         
         try:
-            # Create multimodal content with audio
-            audio_part = {
-                "mime_type": mime_type,
-                "data": base64.b64encode(audio_data).decode()
-            }
-            
-            prompt = "Listen to this audio and respond appropriately as an Arabic teacher. If the child is practicing pronunciation, give encouraging feedback."
-            
-            # Use streaming for real-time feel
-            response = await asyncio.to_thread(
-                session["chat"].send_message,
-                [prompt, audio_part],
-                stream=True
+            # Send audio data through the Live API connection
+            await live_session.send(
+                input=types.LiveClientRealtimeInput(
+                    media_chunks=[
+                        types.Blob(
+                            data=audio_data,
+                            mime_type=mime_type
+                        )
+                    ]
+                )
             )
             
             session["state"] = LiveSessionState.SPEAKING
             
-            full_response = ""
-            for chunk in response:
-                # Check if interrupted
+            # Receive streaming response from Live API
+            full_text = ""
+            audio_chunks = []
+            
+            async for response in live_session.receive():
+                # Check for interruption
                 if session.get("is_interrupted"):
                     yield {"type": "interrupted", "message": "Response interrupted"}
                     break
                 
-                if chunk.text:
-                    full_response += chunk.text
-                    yield {
-                        "type": "text_chunk",
-                        "content": chunk.text
-                    }
+                server_content = response.server_content
+                if server_content:
+                    # Process response parts
+                    if server_content.model_turn and server_content.model_turn.parts:
+                        for part in server_content.model_turn.parts:
+                            if part.text:
+                                full_text += part.text
+                                yield {
+                                    "type": "text_chunk",
+                                    "content": part.text
+                                }
+                            
+                            if part.inline_data:
+                                audio_b64 = base64.b64encode(part.inline_data.data).decode('utf-8')
+                                audio_chunks.append(audio_b64)
+                                yield {
+                                    "type": "audio_chunk",
+                                    "data": audio_b64,
+                                    "mime_type": part.inline_data.mime_type
+                                }
+                    
+                    # Check if turn is complete
+                    if server_content.turn_complete:
+                        break
             
             if not session.get("is_interrupted"):
                 yield {
                     "type": "complete",
-                    "content": full_response
+                    "content": full_text,
+                    "audio_chunks": audio_chunks
                 }
             
             session["state"] = LiveSessionState.IDLE
@@ -216,41 +248,61 @@ Use simple Egyptian dialect when appropriate for kids."""
         session_id: str,
         text: str
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Send text and get streaming response"""
+        """Send text to the Live API session and stream back the response"""
         if session_id not in self.active_sessions:
             yield {"type": "error", "message": "Session not found"}
             return
         
         session = self.active_sessions[session_id]
+        live_session = session["live_session"]
         session["state"] = LiveSessionState.PROCESSING
         session["is_interrupted"] = False
         
         try:
-            response = await asyncio.to_thread(
-                session["chat"].send_message,
-                text,
-                stream=True
+            # Send text through the Live API connection
+            await live_session.send(
+                input=text,
+                end_of_turn=True
             )
             
             session["state"] = LiveSessionState.SPEAKING
             
             full_response = ""
-            for chunk in response:
+            audio_chunks = []
+            
+            async for response in live_session.receive():
                 if session.get("is_interrupted"):
                     yield {"type": "interrupted", "message": "Response interrupted"}
                     break
                 
-                if chunk.text:
-                    full_response += chunk.text
-                    yield {
-                        "type": "text_chunk",
-                        "content": chunk.text
-                    }
+                server_content = response.server_content
+                if server_content:
+                    if server_content.model_turn and server_content.model_turn.parts:
+                        for part in server_content.model_turn.parts:
+                            if part.text:
+                                full_response += part.text
+                                yield {
+                                    "type": "text_chunk",
+                                    "content": part.text
+                                }
+                            
+                            if part.inline_data:
+                                audio_b64 = base64.b64encode(part.inline_data.data).decode('utf-8')
+                                audio_chunks.append(audio_b64)
+                                yield {
+                                    "type": "audio_chunk",
+                                    "data": audio_b64,
+                                    "mime_type": part.inline_data.mime_type
+                                }
+                    
+                    if server_content.turn_complete:
+                        break
             
             if not session.get("is_interrupted"):
                 yield {
                     "type": "complete",
-                    "content": full_response
+                    "content": full_response,
+                    "audio_chunks": audio_chunks
                 }
             
             session["state"] = LiveSessionState.IDLE
@@ -263,6 +315,7 @@ Use simple Egyptian dialect when appropriate for kids."""
     async def interrupt(self, session_id: str) -> bool:
         """
         Interrupt the current response (barge-in).
+        The Live API natively supports interruption.
         """
         if session_id not in self.active_sessions:
             return False
@@ -282,11 +335,21 @@ Use simple Egyptian dialect when appropriate for kids."""
         return False
     
     async def end_session(self, session_id: str) -> bool:
-        """End a live session"""
+        """End a live session and close the Live API connection"""
         if session_id not in self.active_sessions:
             return False
         
         try:
+            session = self.active_sessions[session_id]
+            live_session = session.get("live_session")
+            
+            # Close the Live API connection
+            if live_session:
+                try:
+                    await live_session.close()
+                except Exception as close_err:
+                    logger.warning(f"Error closing live session: {close_err}")
+            
             del self.active_sessions[session_id]
             logger.info(f"Live session ended: {session_id}")
             return True

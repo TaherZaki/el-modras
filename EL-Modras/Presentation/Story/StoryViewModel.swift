@@ -44,9 +44,6 @@ final class StoryViewModel: ObservableObject {
         self.sceneHistory = [story.scenes.first!.id]
     }
     
-    // MARK: - Audio Cache
-    private let cacheManager = AudioCacheManager.shared
-    
     // MARK: - Story Navigation
     
     func startStory() async {
@@ -71,18 +68,9 @@ final class StoryViewModel: ObservableObject {
         isPlaying = true
         avatarMood = .speaking
         
-        // Try to play from cache first (instant!)
-        if let cachedAudio = cacheManager.getAudio(for: currentScene.narratorTextArabic, type: .instruction) {
-            do {
-                try await audioService.playAudio(cachedAudio)
-            } catch {
-                // Fallback to live TTS
-                await audioService.speakNaturalArabic(currentScene.narratorTextArabic, using: geminiService)
-            }
-        } else {
-            // Fallback to live TTS (will also cache it)
-            await audioService.speakNaturalArabic(currentScene.narratorTextArabic, using: geminiService)
-        }
+        // speakNaturalArabic handles: cache check → Gemini TTS → retry → fallback
+        // All with the unified Orus voice
+        await audioService.speakNaturalArabic(currentScene.narratorTextArabic, using: geminiService)
         
         isPlaying = false
         
@@ -104,12 +92,7 @@ final class StoryViewModel: ObservableObject {
         // If choice has a word, speak it and add to learned words
         if let word = choice.word {
             isPlaying = true
-            // Try cached audio first
-            if let cachedAudio = cacheManager.getAudio(for: word.arabic, type: .word) {
-                try? await audioService.playAudio(cachedAudio)
-            } else {
-                await audioService.speakNaturalArabic(word.arabic, using: geminiService)
-            }
+            await audioService.speakNaturalArabic(word.arabic, using: geminiService)
             isPlaying = false
             
             wordsLearned.append(word)
@@ -145,7 +128,7 @@ final class StoryViewModel: ObservableObject {
         
         // Find next scene with higher scene number that we haven't visited
         // OR if we're in a branch scene, find the next main scene
-        for scene in story.scenes {
+        for (index, scene) in story.scenes.enumerated() {
             // Skip scenes we've already visited
             if sceneHistory.contains(scene.id) {
                 continue
@@ -154,10 +137,21 @@ final class StoryViewModel: ObservableObject {
             // Find next scene number (could be branch or main)
             if scene.sceneNumber > currentNumber {
                 currentScene = scene
+                currentSceneIndex = index
                 sceneHistory.append(scene.id)
                 showChoices = false
                 pronunciationScore = nil
                 print("📖 Moving to scene: \(scene.id) (number: \(scene.sceneNumber))")
+                
+                // Preload upcoming scenes in background (lazy loading)
+                Task.detached { [weak self] in
+                    guard let self = self else { return }
+                    await AudioPreloader.shared.preloadUpcomingScenes(
+                        story: self.story,
+                        currentIndex: index,
+                        using: self.geminiService
+                    )
+                }
                 return
             }
         }
@@ -237,14 +231,10 @@ final class StoryViewModel: ObservableObject {
                 // Track progress
                 await trackWordLearned(wordToLearn)
                 
-                // Celebrate and move to next scene (use cached audio!)
+                // Celebrate and move to next scene
                 isPlaying = true
                 let celebrationText = "برافو عليك يا بطل! 🌟"
-                if let cachedAudio = cacheManager.getAudio(for: celebrationText, type: .response) {
-                    try? await audioService.playAudio(cachedAudio)
-                } else {
-                    await audioService.speakNaturalArabic(celebrationText, using: geminiService)
-                }
+                await audioService.speakNaturalArabic(celebrationText, using: geminiService)
                 isPlaying = false
                 
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -260,32 +250,20 @@ final class StoryViewModel: ObservableObject {
                 avatarMood = .encouraging
                 isPlaying = true
                 let tryAgainText = "حاول تاني!"
-                if let cachedAudio = cacheManager.getAudio(for: tryAgainText, type: .response) {
-                    try? await audioService.playAudio(cachedAudio)
-                } else {
-                    await audioService.speakNaturalArabic(tryAgainText, using: geminiService)
-                }
+                await audioService.speakNaturalArabic(tryAgainText, using: geminiService)
                 
                 // Small pause
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 
-                // Say the word first
-                if let cachedWordAudio = cacheManager.getAudio(for: wordToLearn.arabic, type: .word) {
-                    try? await audioService.playAudio(cachedWordAudio)
-                } else {
-                    await audioService.speakNaturalArabic(wordToLearn.arabic, using: geminiService)
-                }
+                // Say the word
+                await audioService.speakNaturalArabic(wordToLearn.arabic, using: geminiService)
                 
                 // Small pause
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 
                 // Then say "كرر ورايا"
                 let repeatPrompt = "كرر ورايا"
-                if let cachedPromptAudio = cacheManager.getAudio(for: repeatPrompt, type: .instruction) {
-                    try? await audioService.playAudio(cachedPromptAudio)
-                } else {
-                    await audioService.speakNaturalArabic(repeatPrompt, using: geminiService)
-                }
+                await audioService.speakNaturalArabic(repeatPrompt, using: geminiService)
                 
                 isPlaying = false
                 avatarMood = .listening

@@ -12,6 +12,10 @@ final class AudioCacheManager {
     
     static let shared = AudioCacheManager()
     
+    // Cache version - increment this to force clear old cache (e.g. when switching TTS voice)
+    private static let cacheVersion = 2  // v2 = Gemini TTS Orus voice (WAV)
+    private static let cacheVersionKey = "AudioCacheVersion"
+    
     // Memory cache for quick access
     private var memoryCache: [String: Data] = [:]
     private let memoryCacheLimit = 50 // Max items in memory
@@ -29,6 +33,14 @@ final class AudioCacheManager {
         cacheDirectory = paths[0].appendingPathComponent("AudioCache")
         
         try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        
+        // Check cache version - clear old cache if version changed
+        let savedVersion = UserDefaults.standard.integer(forKey: AudioCacheManager.cacheVersionKey)
+        if savedVersion != AudioCacheManager.cacheVersion {
+            print("🔄 Cache version changed (\(savedVersion) → \(AudioCacheManager.cacheVersion)), clearing old audio cache...")
+            clearAllCacheSync()
+            UserDefaults.standard.set(AudioCacheManager.cacheVersion, forKey: AudioCacheManager.cacheVersionKey)
+        }
         
         print("📁 Audio cache directory: \(cacheDirectory.path)")
     }
@@ -53,7 +65,7 @@ final class AudioCacheManager {
         }
         
         // Check disk
-        let fileURL = cacheDirectory.appendingPathComponent("\(key).mp3")
+        let fileURL = cacheDirectory.appendingPathComponent("\(key).wav")
         return fileManager.fileExists(atPath: fileURL.path)
     }
     
@@ -69,7 +81,7 @@ final class AudioCacheManager {
         }
         
         // Check disk cache
-        let fileURL = cacheDirectory.appendingPathComponent("\(key).mp3")
+        let fileURL = cacheDirectory.appendingPathComponent("\(key).wav")
         if let data = try? Data(contentsOf: fileURL) {
             // Add to memory cache
             queue.async(flags: .barrier) { [weak self] in
@@ -94,7 +106,7 @@ final class AudioCacheManager {
         }
         
         // Save to disk
-        let fileURL = cacheDirectory.appendingPathComponent("\(key).mp3")
+        let fileURL = cacheDirectory.appendingPathComponent("\(key).wav")
         do {
             try data.write(to: fileURL)
             print("💾 Audio saved to cache: \(text)")
@@ -139,6 +151,20 @@ final class AudioCacheManager {
     func clearAllCache() {
         clearMemoryCache()
         clearDiskCache()
+    }
+    
+    /// Synchronous version for use during init
+    private func clearAllCacheSync() {
+        memoryCache.removeAll()
+        do {
+            let files = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
+            for file in files {
+                try fileManager.removeItem(at: file)
+            }
+            print("🧹 Old cache cleared successfully")
+        } catch {
+            print("❌ Failed to clear old cache: \(error)")
+        }
     }
     
     // MARK: - Cache Size
