@@ -21,7 +21,18 @@ EL-Modras ("The Teacher" in Arabic) is a **Live Agent** that breaks the "text bo
 
 ## 🎥 Demo Video
 
-[Watch the 4-minute demo video](https://youtube.com/watch?v=YOUR_VIDEO_ID)
+> **[Watch the 4-minute demo video](https://youtube.com/watch?v=REPLACE_WITH_VIDEO_ID)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
+
+## ☁️ Proof of Google Cloud Deployment
+
+The backend is live on **Google Cloud Run**:
+- **Service URL**: `https://el-modras-backend-508801329902.us-central1.run.app`
+- **Health Check**: [`/health`](https://el-modras-backend-508801329902.us-central1.run.app/health) returns `{"status":"healthy","gemini_connected":true,"live_api_ready":true,"adk_agent_ready":true}`
+- **Key code files demonstrating Google Cloud usage**:
+  - [`Backend/src/services/gemini_live_service.py`](Backend/src/services/gemini_live_service.py) — Gemini Live API (`client.aio.live.connect()`)
+  - [`Backend/src/services/adk_agent.py`](Backend/src/services/adk_agent.py) — Google ADK Agent
+  - [`Backend/src/services/gemini_service.py`](Backend/src/services/gemini_service.py) — Gemini GenAI SDK (`genai.Client()`)
+  - [`terraform/main.tf`](terraform/main.tf) — Infrastructure as Code (Cloud Run, Firestore, Secret Manager)
 
 ## 🏗️ Architecture
 
@@ -124,7 +135,7 @@ EL-Modras ("The Teacher" in Arabic) is a **Live Agent** that breaks the "text bo
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/el-modras.git
+git clone https://github.com/TaherZaki/el-modras.git
 cd el-modras
 ```
 
@@ -342,9 +353,7 @@ EL-Modras/
 
 ## 📱 Screenshots
 
-| Home | Lesson | Camera | Stories | Progress |
-|------|--------|--------|---------|----------|
-| ![Home](screenshots/home.png) | ![Lesson](screenshots/lesson.png) | ![Camera](screenshots/camera.png) | ![Stories](screenshots/stories.png) | ![Progress](screenshots/progress.png) |
+> Screenshots to be added. The app features: Kids-friendly Home screen, Voice Lesson with animated teacher, Camera Vocabulary learning, Interactive Stories with AI illustrations, and Progress Tracking with stars.
 
 ## 🔑 Key Code References
 
