@@ -21,7 +21,7 @@ EL-Modras ("The Teacher" in Arabic) is a **Live Agent** that breaks the "text bo
 
 ## 🎥 Demo Video
 
-> **[Watch the 4-minute demo video](https://youtube.com/watch?v=REPLACE_WITH_VIDEO_ID)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
+> **[Watch the Demo Video](https://www.youtube.com/shorts/Urj9OcEWvuo)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
 
 ## ☁️ Proof of Google Cloud Deployment
 
@@ -353,7 +353,9 @@ EL-Modras/
 
 ## 📱 Screenshots
 
-> Screenshots to be added. The app features: Kids-friendly Home screen, Voice Lesson with animated teacher, Camera Vocabulary learning, Interactive Stories with AI illustrations, and Progress Tracking with stars.
+| Home Screen | Voice Lesson | Camera Vocab | Interactive Story | Progress |
+|:-----------:|:------------:|:------------:|:-----------------:|:--------:|
+| ![Home](ScreenShots/IMG_6031.PNG) | ![Lesson](ScreenShots/IMG_6033.PNG) | ![Camera](ScreenShots/IMG_6034.PNG) | ![Story](ScreenShots/IMG_6035.PNG) | ![Progress](ScreenShots/IMG_6036.PNG) |
 
 ## 🔑 Key Code References
 
