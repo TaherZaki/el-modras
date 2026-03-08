@@ -85,9 +85,9 @@ struct SplashScreenView: View {
                     VStack(spacing: 12) {
                         // Arabic name with animation
                         HStack(spacing: 4) {
-                            ForEach(Array("المُدَرِّس".enumerated()), id: \.offset) { index, char in
+                            ForEach(Array("نـور".enumerated()), id: \.offset) { index, char in
                                 Text(String(char))
-                                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                                    .font(.system(size: 64, weight: .bold, design: .rounded))
                                     .foregroundStyle(
                                         LinearGradient(
                                             colors: [.white, .white.opacity(0.8)],
@@ -106,7 +106,7 @@ struct SplashScreenView: View {
                             }
                         }
                         
-                        Text("EL-Modras")
+                        Text("المدرس بتاعك")
                             .font(.title2.bold())
                             .foregroundStyle(.white.opacity(0.9))
                             .tracking(3)

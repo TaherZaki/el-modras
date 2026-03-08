@@ -276,7 +276,7 @@ struct KidsLessonView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    Text("المدرس بيفكر...")
+                    Text("نور بيفكر...")
                         .font(.subheadline)
                         .foregroundStyle(.white)
                 }

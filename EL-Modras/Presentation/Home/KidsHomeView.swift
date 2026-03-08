@@ -195,7 +195,7 @@ struct KidsHomeView: View {
             }
             
             // Instruction text
-            Text(welcomeMessage.isEmpty ? "اضغط على المدرس! 👆" : "اختار درس وابدأ تعلم! ")
+            Text(welcomeMessage.isEmpty ? "اضغط على نور! 👆" : "اختار درس وابدأ تعلم! ")
                 .font(.headline)
                 .foregroundStyle(.white.opacity(0.9))
         }
@@ -430,7 +430,7 @@ struct KidsHomeView: View {
         // Egyptian Arabic introduction - more conversational and natural
         let introSequence: [(message: String, mood: TeacherMood, pauseMs: UInt64)] = [
             ("أهلاً يا بطل!", .happy, 600_000_000),
-            ("أنا المدرس...", .speaking, 400_000_000),
+            ("أنا نور... المدرس بتاعك!", .speaking, 600_000_000),
             ("هعلمك عربي بطريقة ممتعة!", .celebrating, 800_000_000),
             ("يلا نبدأ...", .thinking, 500_000_000),
             ("اختار أي درس وابدأ معايا!", .happy, 0)

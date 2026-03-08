@@ -783,7 +783,8 @@ final class LessonViewModel: ObservableObject {
     // Build context string with current lesson and word information
     private func buildLessonContext() -> String {
         var context = """
-        أنت المدرس في تطبيق تعليم اللغة العربية للأطفال.
+        أنت نور، المدرس في تطبيق تعليم اللغة العربية للأطفال.
+        اسمك نور ولو حد سألك قولّه "أنا نور، المدرس بتاعك!"
         
         الدرس الحالي: \(lesson.title) (\(lesson.titleArabic))
         نوع الدرس: \(lesson.category.rawValue)
