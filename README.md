@@ -355,7 +355,7 @@ EL-Modras/
 
 | Home Screen | Voice Lesson | Camera Vocab | Interactive Story | Progress |
 |:-----------:|:------------:|:------------:|:-----------------:|:--------:|
-| ![Home](ScreenShots/IMG_6031.PNG) | ![Lesson](ScreenShots/IMG_6033.PNG) | ![Camera](ScreenShots/IMG_6034.PNG) | ![Story](ScreenShots/IMG_6035.PNG) | ![Progress](ScreenShots/IMG_6036.PNG) |
+| ![Home](ScreenShots/home.PNG) | ![Lesson](ScreenShots/lesson.PNG) | ![Camera](ScreenShots/camera.PNG) | ![Story](ScreenShots/story.PNG) | ![Progress](ScreenShots/progress.PNG) |
 
 ## 🔑 Key Code References
 
