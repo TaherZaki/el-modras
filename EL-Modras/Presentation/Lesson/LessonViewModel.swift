@@ -111,6 +111,9 @@ final class LessonViewModel: ObservableObject {
     func startSession() async {
         guard canStartSession else { return }
         
+        // Stop any audio from home screen
+        audioService.stopSpeaking()
+        
         sessionState = .connecting
         error = nil
         
@@ -147,6 +150,14 @@ final class LessonViewModel: ObservableObject {
             // Set first word to practice
             if let firstWord = lesson.words.first {
                 currentWord = firstWord
+                // Save activity for session memory
+                SessionMemory.shared.saveActivity(
+                    type: .lesson,
+                    id: lesson.id,
+                    title: lesson.titleArabic,
+                    wordIndex: 0,
+                    totalWords: lesson.words.count
+                )
             }
             
         } catch {
@@ -293,6 +304,12 @@ final class LessonViewModel: ObservableObject {
     func startRecording() async {
         guard isSessionActive, !isRecording else { return }
         
+        // Stop any ongoing speech immediately
+        if isPlaying {
+            audioService.stopSpeaking()
+            isPlaying = false
+        }
+        
         do {
             try await audioService.startRecording()
             isRecording = true
@@ -425,8 +442,17 @@ final class LessonViewModel: ObservableObject {
         // Move to next word or finish lesson
         if currentIndex + 1 < lesson.words.count {
             self.currentWord = lesson.words[currentIndex + 1]
+            // Update session memory with progress
+            SessionMemory.shared.saveActivity(
+                type: .lesson,
+                id: lesson.id,
+                title: lesson.titleArabic,
+                wordIndex: currentIndex + 1,
+                totalWords: lesson.words.count
+            )
         } else {
-            // Lesson completed!
+            // Lesson completed! Clear session memory
+            SessionMemory.shared.clearLastActivity()
             Task {
                 await trackLessonCompleted()
             }

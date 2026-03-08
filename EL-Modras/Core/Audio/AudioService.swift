@@ -455,13 +455,22 @@ final class AudioServiceImpl: NSObject, AudioService {
     }
     
     func stopSpeaking() {
+        // Stop device TTS
         if speechSynthesizer.isSpeaking {
             speechSynthesizer.stopSpeaking(at: .immediate)
         }
+        
+        // Stop Gemini TTS audio player
+        if audioPlayer?.isPlaying == true {
+            audioPlayer?.stop()
+        }
+        audioPlayer = nil
+        
+        isPlaying = false
         isSpeaking = false
         speakingProgressSubject.send(SpeakingProgress(isSpeaking: false, currentWord: nil, progress: 0))
         
-        // Resume any waiting continuation
+        // Resume any waiting continuation (so async functions don't hang)
         speechContinuation?.resume()
         speechContinuation = nil
         currentUtterance = nil

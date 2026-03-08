@@ -20,6 +20,9 @@ struct KidsHomeView: View {
     @State private var showingProgress: Bool = false
     @State private var bounceAnimation: Bool = false
     @State private var hasIntroduced: Bool = false
+    @State private var showContinueCard: Bool = false
+    
+    private let sessionMemory = SessionMemory.shared
     
     // Services for avatar speech
     private var audioService: AudioService {
@@ -50,6 +53,12 @@ struct KidsHomeView: View {
                             VStack(spacing: 24) {
                                 // Welcome section with Avatar
                                 welcomeSection
+                                
+                                // Continue where you left off
+                                if showContinueCard, let lastActivity = sessionMemory.lastActivity, lastActivity.isIncomplete {
+                                    continueCard(activity: lastActivity)
+                                        .transition(.scale.combined(with: .opacity))
+                                }
                                 
                                 // Daily Goal Card
                                 dailyGoalCard
@@ -90,6 +99,21 @@ struct KidsHomeView: View {
             .task {
                 await viewModel.loadData()
                 animateWelcome()
+            }
+            .onChange(of: showingLesson) { _, newValue in
+                if newValue != nil {
+                    audioService.stopSpeaking()
+                }
+            }
+            .onChange(of: showingStory) { _, newValue in
+                if newValue != nil {
+                    audioService.stopSpeaking()
+                }
+            }
+            .onChange(of: showingCamera) { _, newValue in
+                if newValue {
+                    audioService.stopSpeaking()
+                }
             }
         }
     }
@@ -427,46 +451,241 @@ struct KidsHomeView: View {
     }
     
     private func speakIntroduction() async {
-        // Egyptian Arabic introduction - more conversational and natural
-        let introSequence: [(message: String, mood: TeacherMood, pauseMs: UInt64)] = [
-            ("أهلاً يا بطل!", .happy, 600_000_000),
-            ("أنا نور... المدرس بتاعك!", .speaking, 600_000_000),
-            ("هعلمك عربي بطريقة ممتعة!", .celebrating, 800_000_000),
-            ("يلا نبدأ...", .thinking, 500_000_000),
-            ("اختار أي درس وابدأ معايا!", .happy, 0)
-        ]
-        
-        for (index, intro) in introSequence.enumerated() {
-            // 1. Update message and mood
-            welcomeMessage = intro.message
-            teacherMood = intro.mood
+        if sessionMemory.isFirstEver {
+            // === FIRST TIME EVER ===
+            sessionMemory.markAppOpened()
             
-            // 2. Start mouth animation FIRST
-            isSpeaking = true
+            let introSequence: [(message: String, mood: TeacherMood, pauseMs: UInt64)] = [
+                ("أهلاً يا بطل!", .happy, 600_000_000),
+                ("أنا نور... المدرس بتاعك!", .speaking, 600_000_000),
+                ("هعلمك عربي بطريقة ممتعة!", .celebrating, 800_000_000),
+                ("يلا نبدأ...", .thinking, 500_000_000),
+                ("اختار أي درس وابدأ معايا!", .happy, 0)
+            ]
             
-            // 3. Small delay to ensure animation starts before audio
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            for (index, intro) in introSequence.enumerated() {
+                welcomeMessage = intro.message
+                teacherMood = intro.mood
+                isSpeaking = true
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                await audioService.speakNaturalArabic(intro.message, using: geminiService)
+                isSpeaking = false
+                if index < introSequence.count - 1 && intro.pauseMs > 0 {
+                    try? await Task.sleep(nanoseconds: intro.pauseMs)
+                }
+            }
             
-            // 4. Speak the message
-            await audioService.speakNaturalArabic(intro.message, using: geminiService)
-            
-            // 5. Stop mouth animation AFTER audio finishes
+            welcomeMessage = "اضغط على أي درس! 👇"
+            teacherMood = .happy
             isSpeaking = false
             
-            // 6. Pause between sentences
-            if index < introSequence.count - 1 && intro.pauseMs > 0 {
-                try? await Task.sleep(nanoseconds: intro.pauseMs)
+        } else if let lastActivity = sessionMemory.lastActivity, lastActivity.isIncomplete {
+            // === RETURNING USER WITH INCOMPLETE ACTIVITY ===
+            sessionMemory.markAppOpened()
+            
+            let activityName = lastActivity.isLesson ? "الدرس" : "القصة"
+            let progressInfo = lastActivity.progressText
+            
+            let returnSequence: [(message: String, mood: TeacherMood, pauseMs: UInt64)] = [
+                ("أهلاً يا بطل! رجعتلي! 😄", .happy, 600_000_000),
+                ("فاكرك كنت في \(activityName): \(lastActivity.title)", .speaking, 700_000_000),
+                ("وصلت لـ \(progressInfo)", .thinking, 600_000_000),
+                ("عايز تكمل ولا تبدأ حاجة جديدة؟", .happy, 0)
+            ]
+            
+            for (index, intro) in returnSequence.enumerated() {
+                welcomeMessage = intro.message
+                teacherMood = intro.mood
+                isSpeaking = true
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                await audioService.speakNaturalArabic(intro.message, using: geminiService)
+                isSpeaking = false
+                if index < returnSequence.count - 1 && intro.pauseMs > 0 {
+                    try? await Task.sleep(nanoseconds: intro.pauseMs)
+                }
             }
+            
+            // Show continue card
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                showContinueCard = true
+            }
+            
+            welcomeMessage = "عايز تكمل ولا تبدأ حاجة جديدة؟"
+            teacherMood = .happy
+            isSpeaking = false
+            
+        } else {
+            // === RETURNING USER, NO INCOMPLETE ACTIVITY ===
+            sessionMemory.markAppOpened()
+            
+            let sessionCount = sessionMemory.totalSessions
+            let greetings: [(message: String, mood: TeacherMood, pauseMs: UInt64)]
+            
+            if sessionCount <= 3 {
+                greetings = [
+                    ("أهلاً يا بطل! نورت! 😄", .happy, 600_000_000),
+                    ("جاهز نتعلم حاجة جديدة؟", .speaking, 500_000_000),
+                    ("يلا اختار درس!", .happy, 0)
+                ]
+            } else {
+                greetings = [
+                    ("يا هلا يا هلا! رجعتلي! 🌟", .happy, 600_000_000),
+                    ("وحشتني يا بطل!", .celebrating, 500_000_000),
+                    ("يلا نتعلم كلمات جديدة!", .happy, 0)
+                ]
+            }
+            
+            for (index, intro) in greetings.enumerated() {
+                welcomeMessage = intro.message
+                teacherMood = intro.mood
+                isSpeaking = true
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                await audioService.speakNaturalArabic(intro.message, using: geminiService)
+                isSpeaking = false
+                if index < greetings.count - 1 && intro.pauseMs > 0 {
+                    try? await Task.sleep(nanoseconds: intro.pauseMs)
+                }
+            }
+            
+            welcomeMessage = "اختار درس أو قصة! 👇"
+            teacherMood = .happy
+            isSpeaking = false
         }
-        
-        // Final state
-        welcomeMessage = "اضغط على أي درس! 👇"
-        teacherMood = .happy
-        isSpeaking = false
         
         // Go to idle after a moment
         try? await Task.sleep(nanoseconds: 2_000_000_000)
         teacherMood = .idle
+    }
+    
+    // MARK: - Continue Card
+    private func continueCard(activity: LastActivity) -> some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack {
+                Text(activity.isLesson ? "📖" : "📚")
+                    .font(.system(size: 30))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("نكمل من هنا؟")
+                        .font(.headline.bold())
+                        .foregroundStyle(.primary)
+                    
+                    Text(activity.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                // Time ago
+                Text(activity.timeAgoText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            
+            // Progress bar
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(activity.progressText)
+                        .font(.caption.bold())
+                        .foregroundStyle(.blue)
+                    Spacer()
+                    Text("\(Int(activity.progressPercent * 100))%")
+                        .font(.caption.bold())
+                        .foregroundStyle(.blue)
+                }
+                
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.blue.opacity(0.15))
+                            .frame(height: 10)
+                        
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geo.size.width * activity.progressPercent, height: 10)
+                    }
+                }
+                .frame(height: 10)
+            }
+            
+            // Buttons
+            HStack(spacing: 12) {
+                // Continue button
+                Button {
+                    continueLastActivity(activity)
+                } label: {
+                    HStack {
+                        Image(systemName: "play.fill")
+                        Text("كمّل! 🚀")
+                            .fontWeight(.bold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                
+                // New activity button
+                Button {
+                    withAnimation {
+                        showContinueCard = false
+                    }
+                    sessionMemory.clearLastActivity()
+                } label: {
+                    HStack {
+                        Image(systemName: "sparkles")
+                        Text("جديد")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.gray.opacity(0.15))
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(.white)
+                .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
+        )
+    }
+    
+    // MARK: - Continue Last Activity
+    private func continueLastActivity(_ activity: LastActivity) {
+        switch activity.type {
+        case .lesson:
+            // Find the lesson and open it
+            if let lesson = viewModel.allLessons.first(where: { $0.id == activity.id }) {
+                showingLesson = lesson
+            }
+        case .story:
+            // Find the story and open it
+            if let story = Story.allStories.first(where: { $0.id == activity.id }) {
+                showingStory = story
+            }
+        case .camera:
+            showingCamera = true
+        }
+        
+        withAnimation {
+            showContinueCard = false
+        }
     }
 }
 

@@ -8,7 +8,7 @@
 import Foundation
 
 // MARK: - Story Model
-struct Story: Identifiable {
+struct Story: Identifiable, Equatable {
     let id: String
     let title: String
     let titleArabic: String
@@ -20,6 +20,10 @@ struct Story: Identifiable {
     let estimatedMinutes: Int
     
     var totalScenes: Int { scenes.count }
+    
+    static func == (lhs: Story, rhs: Story) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Story Scene

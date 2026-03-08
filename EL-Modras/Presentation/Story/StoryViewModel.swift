@@ -47,12 +47,24 @@ final class StoryViewModel: ObservableObject {
     // MARK: - Story Navigation
     
     func startStory() async {
+        // Stop any audio from home screen
+        audioService.stopSpeaking()
+        
         currentSceneIndex = 0
         currentScene = story.scenes.first!
         sceneHistory = [currentScene.id]
         wordsLearned = []
         starsEarned = 0
         isStoryComplete = false
+        
+        // Save activity for session memory
+        SessionMemory.shared.saveActivity(
+            type: .story,
+            id: story.id,
+            title: story.titleArabic,
+            sceneIndex: 0,
+            totalScenes: story.scenes.count
+        )
         
         // Start preloading audio in background for instant playback
         Task.detached { [weak self] in
@@ -143,6 +155,15 @@ final class StoryViewModel: ObservableObject {
                 pronunciationScore = nil
                 print("📖 Moving to scene: \(scene.id) (number: \(scene.sceneNumber))")
                 
+                // Update session memory with progress
+                SessionMemory.shared.saveActivity(
+                    type: .story,
+                    id: story.id,
+                    title: story.titleArabic,
+                    sceneIndex: index,
+                    totalScenes: story.scenes.count
+                )
+                
                 // Preload upcoming scenes in background (lazy loading)
                 Task.detached { [weak self] in
                     guard let self = self else { return }
@@ -159,6 +180,7 @@ final class StoryViewModel: ObservableObject {
         // If no next scene found, story is complete
         isStoryComplete = true
         avatarMood = .celebrating
+        SessionMemory.shared.clearLastActivity()
         print("🎉 Story complete!")
     }
     
@@ -166,6 +188,12 @@ final class StoryViewModel: ObservableObject {
     
     func startRecording() async {
         guard currentScene.requiresPronunciation else { return }
+        
+        // Stop any ongoing speech immediately
+        if isPlaying {
+            audioService.stopSpeaking()
+            isPlaying = false
+        }
         
         do {
             try await audioService.startRecording()
