@@ -196,10 +196,10 @@ final class TrackLessonCompletedUseCaseImpl: TrackLessonCompletedUseCase {
         // Mark lesson as completed
         try await lessonRepository.markLessonCompleted(lesson.id)
         
-        // Update daily progress
+        // Update daily progress (don't add wordsLearned here - each word is tracked individually in trackWordLearned)
         let dailyProgress = DailyProgress(
             date: Date(),
-            wordsLearned: lesson.words.count,
+            wordsLearned: 0,
             lessonsCompleted: 1,
             minutesPracticed: lesson.durationMinutes
         )

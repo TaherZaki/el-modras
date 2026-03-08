@@ -96,12 +96,9 @@ final class ProgressViewModel: ObservableObject {
         error = nil
         
         do {
-            user = try await userRepository.getCurrentUser()
-            guard let userId = user?.id else {
-                isLoading = false
-                return
-            }
-            
+            // Use "current_user" to match LessonViewModel/StoryViewModel
+            // They save progress under "current_user" userId
+            let userId = "current_user"
             progress = try await progressRepository.getProgress(for: userId)
         } catch {
             self.error = error.localizedDescription

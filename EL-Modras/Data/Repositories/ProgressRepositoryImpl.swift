@@ -46,7 +46,12 @@ final class ProgressRepositoryImpl: ProgressRepository {
         // Find or create today's progress
         let calendar = Calendar.current
         if let index = progress.dailyProgress.firstIndex(where: { calendar.isDate($0.date, inSameDayAs: dailyProgress.date) }) {
-            progress.dailyProgress[index] = dailyProgress
+            // ACCUMULATE instead of replace
+            progress.dailyProgress[index].wordsLearned += dailyProgress.wordsLearned
+            progress.dailyProgress[index].lessonsCompleted += dailyProgress.lessonsCompleted
+            progress.dailyProgress[index].minutesPracticed += dailyProgress.minutesPracticed
+            progress.dailyProgress[index].conversationCount += dailyProgress.conversationCount
+            progress.dailyProgress[index].cameraScans += dailyProgress.cameraScans
         } else {
             progress.dailyProgress.append(dailyProgress)
         }
@@ -54,7 +59,22 @@ final class ProgressRepositoryImpl: ProgressRepository {
         // Update totals
         progress.totalWordsLearned += dailyProgress.wordsLearned
         progress.totalMinutesPracticed += dailyProgress.minutesPracticed
+        progress.lessonsCompleted += dailyProgress.lessonsCompleted
         progress.lastPracticeDate = Date()
+        
+        // Update achievement progress counts
+        for i in 0..<progress.achievements.count {
+            switch progress.achievements[i].type {
+            case .firstWord, .tenWords, .fiftyWords, .hundredWords:
+                progress.achievements[i].progress = progress.totalWordsLearned
+            case .firstLesson, .tenLessons:
+                progress.achievements[i].progress = progress.lessonsCompleted
+            case .weekStreak, .monthStreak:
+                progress.achievements[i].progress = progress.currentStreak
+            default:
+                break
+            }
+        }
         
         try await saveProgress(progress)
     }
@@ -75,8 +95,11 @@ final class ProgressRepositoryImpl: ProgressRepository {
         guard var progress = try await getProgress(for: userId) else { return }
         
         if let index = progress.achievements.firstIndex(where: { $0.type == achievementType }) {
-            progress.achievements[index].isUnlocked = true
-            progress.achievements[index].unlockedAt = Date()
+            if !progress.achievements[index].isUnlocked {
+                progress.achievements[index].isUnlocked = true
+                progress.achievements[index].unlockedAt = Date()
+            }
+            progress.achievements[index].progress = max(progress.achievements[index].progress, progress.achievements[index].target)
         }
         
         try await saveProgress(progress)
@@ -108,6 +131,13 @@ final class ProgressRepositoryImpl: ProgressRepository {
         }
         
         progress.lastPracticeDate = today
+        
+        // Update streak achievement progress
+        for i in 0..<progress.achievements.count {
+            if progress.achievements[i].type == .weekStreak || progress.achievements[i].type == .monthStreak {
+                progress.achievements[i].progress = progress.currentStreak
+            }
+        }
         
         // Check streak achievements
         if progress.currentStreak >= 7 {

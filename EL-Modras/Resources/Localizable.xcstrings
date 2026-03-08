@@ -1,6 +1,21 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "!اكتشف" : {
+
+    },
+    "!الكاميرا بتجهز" : {
+
+    },
+    "!ثانية واحدة" : {
+
+    },
+    "!محتاجين الكاميرا" : {
+
+    },
+    "...بدوّر" : {
+
+    },
     "%@ - %@" : {
       "localizations" : {
         "en" : {
@@ -42,9 +57,6 @@
     "%lld%%" : {
 
     },
-    "%lld%% confident" : {
-
-    },
     "⭐️" : {
 
     },
@@ -57,10 +69,22 @@
     "🏆" : {
 
     },
+    "👆" : {
+
+    },
     "📖" : {
 
     },
     "📖 قصص تفاعلية" : {
+
+    },
+    "📷" : {
+
+    },
+    "📸" : {
+
+    },
+    "🔍" : {
 
     },
     "0%" : {
@@ -179,12 +203,6 @@
           }
         }
       }
-    },
-    "Camera Access Required" : {
-
-    },
-    "Camera Learn" : {
-
     },
     "Cancel" : {
 
@@ -590,9 +608,6 @@
         }
       }
     },
-    "Listen" : {
-
-    },
     "listening" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -707,15 +722,6 @@
     "OK" : {
 
     },
-    "Open Settings" : {
-
-    },
-    "Point at an object and tap to capture" : {
-
-    },
-    "Point your camera at objects to learn their Arabic names" : {
-
-    },
     "Practice this word:" : {
 
     },
@@ -742,9 +748,6 @@
     "Progress" : {
 
     },
-    "Recognizing object..." : {
-
-    },
     "recording" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -762,13 +765,7 @@
         }
       }
     },
-    "Related Words" : {
-
-    },
     "Retry" : {
-
-    },
-    "Scan Again" : {
 
     },
     "Session Error" : {
@@ -795,9 +792,6 @@
 
     },
     "Start Lesson" : {
-
-    },
-    "Starting camera..." : {
 
     },
     "tap_any_lesson" : {
@@ -891,9 +885,6 @@
     "Unlocked" : {
 
     },
-    "Using Gemini Vision AI" : {
-
-    },
     "Welcome back, %@!" : {
 
     },
@@ -952,7 +943,13 @@
     "اسمع" : {
 
     },
+    "اسمع تاني" : {
+
+    },
     "اضغط على المدرس! 👆" : {
+
+    },
+    "افتح الإعدادات" : {
 
     },
     "التالي" : {
@@ -989,6 +986,15 @@
 
     },
     "رجوع للرئيسية" : {
+
+    },
+    "صوّر أي حاجة!" : {
+
+    },
+    "صوّر تاني" : {
+
+    },
+    "عشان تتعلم كلمات جديدة\n!صوّر أي حاجة حواليك" : {
 
     },
     "قاطع" : {

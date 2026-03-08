@@ -148,7 +148,8 @@ final class DependencyContainer: ObservableObject {
             recognizeObjectUseCase: recognizeObjectUseCase,
             learnWordUseCase: learnWordUseCase,
             audioService: audioService,
-            geminiService: geminiService
+            geminiService: geminiService,
+            progressRepository: progressRepository
         )
     }
     

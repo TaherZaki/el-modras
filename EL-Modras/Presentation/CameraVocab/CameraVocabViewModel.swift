@@ -32,6 +32,7 @@ final class CameraVocabViewModel: NSObject, ObservableObject {
     private let learnWordUseCase: LearnWordUseCase
     private let audioService: AudioService
     private let geminiService: GeminiService
+    private let progressRepository: ProgressRepository?
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -40,12 +41,14 @@ final class CameraVocabViewModel: NSObject, ObservableObject {
         recognizeObjectUseCase: RecognizeObjectUseCase,
         learnWordUseCase: LearnWordUseCase,
         audioService: AudioService,
-        geminiService: GeminiService
+        geminiService: GeminiService,
+        progressRepository: ProgressRepository? = nil
     ) {
         self.recognizeObjectUseCase = recognizeObjectUseCase
         self.learnWordUseCase = learnWordUseCase
         self.audioService = audioService
         self.geminiService = geminiService
+        self.progressRepository = progressRepository
         super.init()
     }
     
@@ -181,6 +184,9 @@ final class CameraVocabViewModel: NSObject, ObservableObject {
             
             if !learnedWords.contains(where: { $0.arabic == newWord.arabic }) {
                 learnedWords.append(newWord)
+                
+                // Track progress
+                await trackCameraScan(word: newWord)
             }
             
         } catch {
@@ -210,6 +216,32 @@ final class CameraVocabViewModel: NSObject, ObservableObject {
     func clearRecognition() {
         recognizedObject = nil
         capturedImage = nil
+    }
+    
+    // MARK: - Progress Tracking
+    private func trackCameraScan(word: Word) async {
+        guard let repo = progressRepository else { return }
+        do {
+            let daily = DailyProgress(
+                date: Date(),
+                wordsLearned: 1,
+                minutesPracticed: 1,
+                cameraScans: 1
+            )
+            try await repo.updateDailyProgress(daily, for: "current_user")
+            try await repo.updateStreak(for: "current_user")
+            
+            // Check camera explorer achievement
+            let progress = try await repo.getProgress(for: "current_user")
+            let totalScans = progress?.dailyProgress.reduce(0) { $0 + $1.cameraScans } ?? 0
+            if totalScans >= 20 {
+                try await repo.unlockAchievement(.cameraExplorer, for: "current_user")
+            }
+            
+            print("✅ Tracked camera scan: \(word.arabic)")
+        } catch {
+            print("❌ Failed to track camera scan: \(error)")
+        }
     }
 }
 
