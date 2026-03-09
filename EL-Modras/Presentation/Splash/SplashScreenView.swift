@@ -84,27 +84,23 @@ struct SplashScreenView: View {
                 if showAppName {
                     VStack(spacing: 12) {
                         // Arabic name with animation
-                        HStack(spacing: 4) {
-                            ForEach(Array("نـور".enumerated()), id: \.offset) { index, char in
-                                Text(String(char))
-                                    .font(.system(size: 64, weight: .bold, design: .rounded))
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.white, .white.opacity(0.8)],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
-                                    .offset(y: isAnimating ? -5 : 5)
-                                    .animation(
-                                        .easeInOut(duration: 0.6)
-                                        .repeatForever(autoreverses: true)
-                                        .delay(Double(index) * 0.1),
-                                        value: isAnimating
-                                    )
-                            }
-                        }
+                        Text("نـور")
+                            .font(.system(size: 64, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.white, .white.opacity(0.8)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
+                            .offset(y: isAnimating ? -5 : 5)
+                            .animation(
+                                .easeInOut(duration: 0.6)
+                                .repeatForever(autoreverses: true),
+                                value: isAnimating
+                            )
+                            .environment(\.layoutDirection, .rightToLeft)
                         
                         Text("المدرس بتاعك")
                             .font(.title2.bold())
