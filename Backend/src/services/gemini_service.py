@@ -189,7 +189,7 @@ Current lesson context will be provided. Focus on the lesson objectives while re
                 contents=[
                     types.Content(
                         parts=[
-                            types.Part.from_text(self.system_prompt + "\n\nListen to this audio and respond as an Arabic teacher."),
+                            types.Part.from_text(text=self.system_prompt + "\n\nListen to this audio and respond as an Arabic teacher."),
                             audio_part
                         ]
                     )
@@ -348,7 +348,7 @@ Current lesson context will be provided. Focus on the lesson objectives while re
                 contents=[
                     types.Content(
                         parts=[
-                            types.Part.from_text(prompt),
+                            types.Part.from_text(text=prompt),
                             audio_part
                         ]
                     )
@@ -395,7 +395,7 @@ Only respond with the JSON, no other text."""
                 contents=[
                     types.Content(
                         parts=[
-                            types.Part.from_text(prompt),
+                            types.Part.from_text(text=prompt),
                             image_part
                         ]
                     )
@@ -474,7 +474,7 @@ Respond ONLY with valid JSON:
                     contents=[
                         types.Content(
                             parts=[
-                                types.Part.from_text(prompt),
+                                types.Part.from_text(text=prompt),
                                 audio_part
                             ]
                         )
