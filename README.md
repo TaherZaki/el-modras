@@ -25,14 +25,24 @@ EL-Modras ("The Teacher" in Arabic) is a **Live Agent** that breaks the "text bo
 
 ## ☁️ Proof of Google Cloud Deployment
 
-The backend is live on **Google Cloud Run**:
-- **Service URL**: `https://el-modras-backend-508801329902.us-central1.run.app`
-- **Health Check**: [`/health`](https://el-modras-backend-508801329902.us-central1.run.app/health) returns `{"status":"healthy","gemini_connected":true,"live_api_ready":true,"adk_agent_ready":true}`
-- **Key code files demonstrating Google Cloud usage**:
-  - [`Backend/src/services/gemini_live_service.py`](Backend/src/services/gemini_live_service.py) — Gemini Live API (`client.aio.live.connect()`)
-  - [`Backend/src/services/adk_agent.py`](Backend/src/services/adk_agent.py) — Google ADK Agent
-  - [`Backend/src/services/gemini_service.py`](Backend/src/services/gemini_service.py) — Gemini GenAI SDK (`genai.Client()`)
-  - [`terraform/main.tf`](terraform/main.tf) — Infrastructure as Code (Cloud Run, Firestore, Secret Manager)
+### 🟢 Live Service (try it now!)
+```bash
+curl https://el-modras-backend-508801329902.us-central1.run.app/health
+```
+**Response:** `{"status":"healthy","gemini_connected":true,"live_api_ready":true,"adk_agent_ready":true,"model":"gemini-2.5-flash","version":"2.0.0"}`
+
+### 📁 Key Code Files (Google Cloud Services & APIs)
+
+| Google Cloud Service | Code File | What It Does |
+|---------------------|-----------|--------------|
+| **Gemini GenAI SDK** | [`Backend/src/services/gemini_service.py`](https://github.com/TaherZaki/el-modras/blob/main/Backend/src/services/gemini_service.py) | `from google import genai` → `genai.Client()` for text, vision, TTS, pronunciation analysis |
+| **Gemini Live API** | [`Backend/src/services/gemini_live_service.py`](https://github.com/TaherZaki/el-modras/blob/main/Backend/src/services/gemini_live_service.py) | `client.aio.live.connect()` for real-time bidirectional audio streaming |
+| **Google ADK** | [`Backend/src/services/adk_agent.py`](https://github.com/TaherZaki/el-modras/blob/main/Backend/src/services/adk_agent.py) | `from google.adk import Agent` — AI tutor agent with 6 tools |
+| **Cloud Run** | [`Backend/Dockerfile`](https://github.com/TaherZaki/el-modras/blob/main/Backend/Dockerfile) | Containerized FastAPI backend deployed on Cloud Run |
+| **Secret Manager** | [`Backend/src/config.py`](https://github.com/TaherZaki/el-modras/blob/main/Backend/src/config.py) | API keys stored securely in Google Secret Manager |
+| **Cloud Firestore** | [`Backend/src/config.py`](https://github.com/TaherZaki/el-modras/blob/main/Backend/src/config.py) | User progress & learning history stored in Firestore |
+| **Terraform IaC** | [`terraform/main.tf`](https://github.com/TaherZaki/el-modras/blob/main/terraform/main.tf) | Automated infrastructure: Cloud Run + Firestore + Secret Manager |
+| **Deploy Scripts** | [`Backend/scripts/deploy.sh`](https://github.com/TaherZaki/el-modras/blob/main/Backend/scripts/deploy.sh) | Automated Cloud Run deployment with `gcloud run deploy` |
 
 ## 🏗️ Architecture
 
