@@ -46,6 +46,11 @@ curl https://el-modras-backend-508801329902.us-central1.run.app/health
 
 ## 🏗️ Architecture
 
+![Architecture Diagram](ScreenShots/architecture_diagram.png)
+
+<details>
+<summary>📊 Text Version (click to expand)</summary>
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         iOS App (SwiftUI)                        │
@@ -106,6 +111,7 @@ curl https://el-modras-backend-508801329902.us-central1.run.app/health
 │  └──────────────┘  └──────────────┘  └────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
+</details>
 
 ## 🛠️ Tech Stack
 
