@@ -21,7 +21,7 @@ EL-Modras ("The Teacher" in Arabic) is a **Live Agent** that breaks the "text bo
 
 ## 🎥 Demo Video
 
-> **[Watch the Demo Video](https://www.youtube.com/shorts/WLeAEIefv2k)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
+> **[Watch the Demo Video](https://youtu.be/RVVEqYE9Djg)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
 
 ## ☁️ Proof of Google Cloud Deployment
 
