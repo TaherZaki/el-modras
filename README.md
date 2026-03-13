@@ -1,8 +1,11 @@
-# EL-Modras (المدرس) - AI Arabic Language Tutor
+# Nour (نور) - AI Arabic Language Tutor
+
+> 🆕 **Built entirely for the Gemini Live Agent Challenge (Feb 24 – Mar 16, 2026).** This is a brand-new project — [first commit: Feb 24, 2026](../../commit/065ec5b). Every line of code was written during the contest period.
 
 > Real-time AI-powered Arabic language tutor using **Gemini Live API** and **Google ADK** for natural voice conversations, visual vocabulary learning, and interactive storytelling.
 
 ![Gemini Live Agent Challenge](https://img.shields.io/badge/Hackathon-Gemini%20Live%20Agent%20Challenge-blue)
+![New Project](https://img.shields.io/badge/🆕-New%20Project%20(Built%20Feb%2024--Mar%202026)-brightgreen)
 ![Category](https://img.shields.io/badge/Category-Live%20Agents-green)
 ![SDK](https://img.shields.io/badge/SDK-google--genai-red)
 ![ADK](https://img.shields.io/badge/Framework-Google%20ADK-orange)
@@ -10,7 +13,7 @@
 
 ## 📖 Overview
 
-EL-Modras ("The Teacher" in Arabic) is a **Live Agent** that breaks the "text box" paradigm by enabling natural, real-time voice conversations for learning Arabic. Using **Gemini Live API** (`client.aio.live.connect()`) and **Google ADK (Agent Development Kit)**, learners can:
+**Nour (نور)** — meaning "Light" in Arabic — is a **Live Agent** that breaks the "text box" paradigm by enabling natural, real-time voice conversations for teaching Arabic to children. Built from scratch for the **Gemini Live Agent Challenge**, Nour uses **Gemini Live API** (`client.aio.live.connect()`) and **Google ADK (Agent Development Kit)** to create an immersive, multimodal learning experience where kids can:
 
 - 🗣️ **Speak naturally** with an AI tutor via real-time bidirectional audio streaming
 - 🔄 **Interrupt freely** — barge-in support lets you speak mid-response

@@ -1,4 +1,6 @@
-# EL-Modras (المدرس) — Devpost Submission
+# Nour (نور) — AI Arabic Language Tutor | Devpost Submission
+
+> 🆕 **This project was built entirely from scratch for the Gemini Live Agent Challenge.** First commit: February 24, 2026 (Day 1 of the hackathon). Every line of code, every design decision, and every deployment was created during the contest period.
 
 ## Inspiration
 
@@ -8,9 +10,9 @@ We asked ourselves: **What if learning Arabic felt like talking to a real teache
 
 ## What it does
 
-**EL-Modras (المدرس — "The Teacher")** is a next-generation AI Arabic language tutor built for children, powered by Gemini Live API and Google ADK. It goes far beyond text-in/text-out:
+**Nour (نور — "Light" in Arabic)** is a next-generation AI Arabic language tutor built for children, powered by Gemini Live API and Google ADK. It goes far beyond text-in/text-out:
 
-- 🗣️ **Real-time voice lessons** — The AI teacher (Ustaz Nour) speaks in natural Egyptian Arabic dialect, teaches words, puts them in sentences, and asks the child to repeat. The child can interrupt mid-sentence to ask questions — just like a real classroom.
+- 🗣️ **Real-time voice lessons** — The AI teacher Nour speaks in natural Egyptian Arabic dialect, teaches words, puts them in sentences, and asks the child to repeat. The child can interrupt mid-sentence to ask questions — just like a real classroom.
 - 📷 **Camera vocabulary** — Point your phone camera at any object. Gemini Vision identifies it instantly and teaches you the Arabic word, pronunciation, and an example sentence.
 - 📖 **Interactive stories** — Branching narratives where children learn vocabulary through context. The teacher narrates the story, teaches new words along the way ("كرر ورايا — حليب!"), and the child practices pronunciation to progress.
 - 🎯 **Pronunciation feedback** — Dual-engine approach: iOS Speech Recognition for instant local feedback, with Gemini multimodal audio analysis as verification. Scoring is lenient and encouraging for kids.
@@ -80,7 +82,7 @@ We asked ourselves: **What if learning Arabic felt like talking to a real teache
 - **Pre-caching is essential for UX** — Any perceptible delay in a children's app kills engagement. The difference between 0ms (cached) and 2000ms (API call) response time is the difference between a child staying engaged or losing interest.
 - **Multimodal changes everything** — Combining voice, vision, and interactive storytelling in one app creates an experience that no single modality could achieve alone. A child pointing at their pet and hearing "ده قطة! كرر ورايا: قطة!" is magical.
 
-## What's next for EL-Modras
+## What's next for Nour
 
 - **Dialect selection** — Support Egyptian, Levantine, Gulf, and Maghreb Arabic dialects with dialect-specific voice profiles
 - **AR vocabulary overlay** — Use ARKit to overlay Arabic labels on real-world objects in real-time through the camera
