@@ -24,7 +24,7 @@
 
 ## 🎥 Demo Video
 
-> **[Watch the Demo Video](https://youtu.be/RVVEqYE9Djg)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
+> **[Watch the Demo Video](https://youtu.be/sHZyRiOW4Os)** — Shows real-time voice conversations, camera vocabulary, interactive stories, and pronunciation feedback.
 
 ## ☁️ Proof of Google Cloud Deployment
 
