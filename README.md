@@ -427,4 +427,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ for the **Gemini Live Agent Challenge 2025** | `#GeminiLiveAgentChallenge`
+Built with ❤️ for the **Gemini Live Agent Challenge 2026** | `#GeminiLiveAgentChallenge`
